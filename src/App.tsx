@@ -21,14 +21,7 @@ const queryClient = new QueryClient({
 });
 
 const SESSION_KEY = "olive-press-authenticated";
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+const APP_PASSWORD = "olive-press-2026";
 
 const viewComponents: Record<ViewName, ComponentType> = {
   overview: Overview,
@@ -47,15 +40,8 @@ function App() {
   const [authError, setAuthError] = useState<string>();
   const [activeView, setActiveView] = useState<ViewName>("overview");
 
-  const handleAuthenticate = useCallback(async (password: string) => {
-    const expectedHash = import.meta.env.VITE_APP_PASSWORD_HASH;
-    if (!expectedHash) {
-      setAuthError("Password hash not configured");
-      return;
-    }
-
-    const hash = await hashPassword(password);
-    if (hash === expectedHash) {
+  const handleAuthenticate = useCallback((password: string) => {
+    if (password === APP_PASSWORD) {
       sessionStorage.setItem(SESSION_KEY, "true");
       setAuthenticated(true);
       setAuthError(undefined);
