@@ -7,6 +7,7 @@ import {
   Users,
   Image,
   TrendingUp,
+  Calculator,
   type LucideIcon,
 } from "lucide-react";
 
@@ -18,7 +19,8 @@ export type ViewName =
   | "risks"
   | "team"
   | "gallery"
-  | "market";
+  | "market"
+  | "financial";
 
 interface NavItem {
   key: ViewName;
@@ -35,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "team", label: "Team", icon: Users },
   { key: "gallery", label: "Gallery", icon: Image },
   { key: "market", label: "Market Check", icon: TrendingUp },
+  { key: "financial", label: "Financial Model", icon: Calculator },
 ];
 
 interface SidebarProps {
