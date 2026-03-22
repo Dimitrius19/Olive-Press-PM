@@ -30,23 +30,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   // Construction Cost Index (overall)
   try {
-    results.constructionCostIndex = await fetchEurostat("CC");
+    results.constructionCostIndex = await fetchEurostat("COST");
   } catch (e: unknown) {
     errors.push(`Construction Cost Index: ${(e as Error).message}`);
   }
 
-  // Construction Cost — Materials component
+  // Construction Producer Prices
   try {
-    results.materialPriceIndex = await fetchEurostat("CC_E01");
+    results.materialPriceIndex = await fetchEurostat("PRC_PRR");
   } catch (e: unknown) {
-    errors.push(`Material Price Index: ${(e as Error).message}`);
+    errors.push(`Producer Price Index: ${(e as Error).message}`);
   }
 
-  // Construction Cost — Labour component
+  // Also fetch the detailed material price index from a different dataset
   try {
-    results.labourCostIndex = await fetchEurostat("CC_E02");
+    const url = `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_copi_m?geo=EL&indic_bt=COST&s_adj=NSA&unit=I15&freq=M&lastTimePeriod=24`;
+    const res = await fetch(url);
+    if (res.ok) {
+      results.labourCostIndex = await res.json();
+    }
   } catch (e: unknown) {
-    errors.push(`Labour Cost Index: ${(e as Error).message}`);
+    errors.push(`Monthly Cost Index: ${(e as Error).message}`);
   }
 
   // Greece CPI (HICP) from Eurostat
