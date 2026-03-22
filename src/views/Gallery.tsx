@@ -101,9 +101,19 @@ export function Gallery() {
 
       {/* Photo grid */}
       {filtered.length === 0 ? (
-        <p className="text-stone-400 text-sm text-center py-12">
-          No photos match the selected tag.
-        </p>
+        <div className="relative rounded-2xl overflow-hidden py-20 flex flex-col items-center justify-center">
+          <img
+            src="/aegean-coast.jpg"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover opacity-10"
+          />
+          <p className="relative text-stone-500 text-sm font-medium">
+            Capture the renovation journey — upload site photos
+          </p>
+          <p className="relative text-stone-400 text-xs mt-1">
+            Document progress from demolition to finishing touches
+          </p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((photo) => (

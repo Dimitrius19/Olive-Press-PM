@@ -89,6 +89,9 @@ export function Overview() {
         </div>
       </div>
 
+      {/* Mediterranean divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-amber-600/30 to-transparent" />
+
       {/* Overall Progress */}
       <div>
         <div className="flex justify-between text-sm text-stone-600 mb-1">

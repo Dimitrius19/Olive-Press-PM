@@ -195,9 +195,19 @@ export function Documents() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <p className="text-stone-400 text-sm text-center py-8">
-            No documents found.
-          </p>
+          <div className="relative py-16 flex flex-col items-center justify-center overflow-hidden">
+            <img
+              src="/olive-tree.jpg"
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover opacity-[0.07]"
+            />
+            <p className="relative text-stone-500 text-sm font-medium">
+              Upload project documents to get started
+            </p>
+            <p className="relative text-stone-400 text-xs mt-1">
+              Permits, studies, plans, and contracts — all in one place
+            </p>
+          </div>
         )}
       </div>
 

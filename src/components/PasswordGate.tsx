@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Leaf } from "lucide-react";
 
 interface PasswordGateProps {
   onAuthenticated: (password: string) => void;
@@ -22,9 +23,12 @@ export function PasswordGate({ onAuthenticated, error }: PasswordGateProps) {
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 w-full max-w-sm relative z-10 border border-white/30">
-        <h1 className="text-2xl font-bold text-stone-800 mb-0.5">
-          Olive Press Hotel 4*
-        </h1>
+        <div className="flex items-center gap-2 mb-0.5">
+          <Leaf size={22} className="text-emerald-700" />
+          <h1 className="text-2xl font-bold text-stone-800">
+            Olive Press Hotel 4*
+          </h1>
+        </div>
         <p className="text-stone-500 text-sm mb-1">
           Renovation Project — Molyvos, Lesvos
         </p>
@@ -47,6 +51,9 @@ export function PasswordGate({ onAuthenticated, error }: PasswordGateProps) {
             Enter
           </button>
         </form>
+        <p className="text-stone-400 text-xs text-center mt-5">
+          Est. 19th Century
+        </p>
       </div>
     </div>
   );

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Users,
   Image,
+  Leaf,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,10 +44,13 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
   return (
     <aside className="w-64 bg-[#1a2e1a] text-stone-300 flex flex-col min-h-screen">
       <div className="p-6">
-        <h1 className="text-lg font-bold text-white tracking-tight">
-          Olive Press
-        </h1>
-        <p className="text-xs text-emerald-400/60">Project Management</p>
+        <div className="flex items-center gap-2">
+          <Leaf size={20} className="text-emerald-400" />
+          <h1 className="text-lg font-bold text-white/95 tracking-tight">
+            Olive Press
+          </h1>
+        </div>
+        <p className="text-xs text-emerald-400 mt-1 ml-7">Molyvos, Lesvos</p>
       </div>
       <nav className="flex-1 px-3">
         <ul className="space-y-1">
@@ -74,9 +78,9 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
           })}
         </ul>
       </nav>
-      <div className="p-4 border-t border-emerald-900/40">
-        <p className="text-[10px] text-stone-600 text-center">
-          Molyvos, Lesvos
+      <div className="p-4 border-t border-white/10">
+        <p className="text-[10px] text-emerald-600/50 text-center">
+          Molyvos, Lesvos — Greece
         </p>
       </div>
     </aside>
