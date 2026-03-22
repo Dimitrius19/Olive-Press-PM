@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Users,
   Image,
+  TrendingUp,
   type LucideIcon,
 } from "lucide-react";
 
@@ -16,7 +17,8 @@ export type ViewName =
   | "documents"
   | "risks"
   | "team"
-  | "gallery";
+  | "gallery"
+  | "market";
 
 interface NavItem {
   key: ViewName;
@@ -32,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "risks", label: "Risks", icon: AlertTriangle },
   { key: "team", label: "Team", icon: Users },
   { key: "gallery", label: "Gallery", icon: Image },
+  { key: "market", label: "Market Check", icon: TrendingUp },
 ];
 
 interface SidebarProps {
