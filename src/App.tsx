@@ -1,8 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, type ComponentType } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PasswordGate } from "./components/PasswordGate";
 import { Layout } from "./components/Layout";
 import type { ViewName } from "./components/Sidebar";
+import { Overview } from "./views/Overview";
+import { Timeline } from "./views/Timeline";
+import { Budget } from "./views/Budget";
+import { Documents } from "./views/Documents";
+import { Risks } from "./views/Risks";
+import { Team } from "./views/Team";
+import { Gallery } from "./views/Gallery";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,14 +30,14 @@ async function hashPassword(password: string): Promise<string> {
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-const VIEW_LABELS: Record<ViewName, string> = {
-  overview: "Project Overview",
-  timeline: "Timeline",
-  budget: "Budget Tracker",
-  documents: "Documents",
-  risks: "Risk Register",
-  team: "Team Directory",
-  gallery: "Photo Gallery",
+const viewComponents: Record<ViewName, ComponentType> = {
+  overview: Overview,
+  timeline: Timeline,
+  budget: Budget,
+  documents: Documents,
+  risks: Risks,
+  team: Team,
+  gallery: Gallery,
 };
 
 function App() {
@@ -61,15 +68,12 @@ function App() {
     return <PasswordGate onAuthenticated={handleAuthenticate} error={authError} />;
   }
 
+  const ActiveComponent = viewComponents[activeView];
+
   return (
     <QueryClientProvider client={queryClient}>
       <Layout activeView={activeView} onNavigate={setActiveView}>
-        <div>
-          <h2 className="text-2xl font-bold text-stone-800 mb-4">
-            {VIEW_LABELS[activeView]}
-          </h2>
-          <p className="text-stone-500">Coming soon.</p>
-        </div>
+        <ActiveComponent />
       </Layout>
     </QueryClientProvider>
   );
