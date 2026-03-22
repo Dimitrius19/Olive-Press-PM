@@ -92,6 +92,19 @@ export function Overview() {
       {/* Mediterranean divider */}
       <div className="h-px bg-gradient-to-r from-transparent via-amber-600/30 to-transparent" />
 
+      {/* Hotel Photo Strip */}
+      <div className="grid grid-cols-3 gap-3 -mt-2">
+        <div className="rounded-xl overflow-hidden h-28">
+          <img src="/hotel-pool.jpg" alt="Pool & Castle view" className="w-full h-full object-cover" />
+        </div>
+        <div className="rounded-xl overflow-hidden h-28">
+          <img src="/hotel-view.jpg" alt="Hotel from sea" className="w-full h-full object-cover" />
+        </div>
+        <div className="rounded-xl overflow-hidden h-28">
+          <img src="/hotel-exterior.jpg" alt="Hotel exterior" className="w-full h-full object-cover" />
+        </div>
+      </div>
+
       {/* Overall Progress */}
       <div>
         <div className="flex justify-between text-sm text-stone-600 mb-1">

@@ -103,7 +103,7 @@ export function Gallery() {
       {filtered.length === 0 ? (
         <div className="relative rounded-2xl overflow-hidden py-20 flex flex-col items-center justify-center">
           <img
-            src="/aegean-coast.jpg"
+            src="/hotel-pool.jpg"
             alt=""
             className="absolute inset-0 w-full h-full object-cover opacity-10"
           />

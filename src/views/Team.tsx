@@ -87,10 +87,21 @@ export function Team() {
       </p>
     );
 
+  const groupedEntries = Array.from(grouped.entries());
+
   return (
     <div className="space-y-6">
+      {/* Team banner */}
+      <div className="relative rounded-xl overflow-hidden h-32 -mx-0 mb-6">
+        <img src="/hotel-view.jpg" alt="Olive Press Hotel" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <div className="absolute bottom-0 left-0 p-4">
+          <h1 className="text-xl font-bold text-white">Project Team</h1>
+          <p className="text-white/70 text-sm">{members?.length ?? 0} members across {groupedEntries.length} organizations</p>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-stone-800">Team Directory</h2>
         <button
           onClick={() => setShowAddForm(true)}
           className="px-4 py-2 bg-stone-800 text-white text-sm rounded-lg hover:bg-stone-700 transition-colors"
@@ -154,7 +165,7 @@ export function Team() {
       )}
 
       {/* Grouped cards */}
-      {Array.from(grouped.entries()).map(([org, orgMembers]) => (
+      {groupedEntries.map(([org, orgMembers]) => (
         <div key={org}>
           <h3 className="text-sm font-semibold text-stone-500 uppercase tracking-wide mb-3 bg-amber-50/50 rounded-lg px-3 py-2">
             {org}

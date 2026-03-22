@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   Users,
   Image,
-  Leaf,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,7 +44,7 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
     <aside className="w-64 bg-[#1a2e1a] text-stone-300 flex flex-col min-h-screen">
       <div className="p-6">
         <div className="flex items-center gap-2">
-          <Leaf size={20} className="text-emerald-400" />
+          <img src="/hotel-logo.png" alt="Olive Press" className="w-8 h-8 rounded-full bg-white/10 p-0.5" />
           <h1 className="text-lg font-bold text-white/95 tracking-tight">
             Olive Press
           </h1>
