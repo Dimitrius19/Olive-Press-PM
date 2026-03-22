@@ -107,17 +107,24 @@ export function calculateIRR(cashFlows: number[], guess = 0.1): number {
   return rate;
 }
 
-export function runScenario(inputs: ScenarioInputs): ScenarioResult {
+export function runScenario(
+  inputs: ScenarioInputs,
+  investment = INVESTMENT,
+  rooms = ROOMS,
+  operatingDaysFull = OPERATING_DAYS_FULL,
+  modelYears = MODEL_YEARS,
+): ScenarioResult {
+  const operatingDaysYear1 = Math.round(operatingDaysFull * (OPERATING_DAYS_YEAR1 / OPERATING_DAYS_FULL));
   const projections: YearProjection[] = [];
   let cumulativeNoi = 0;
 
-  for (let i = 0; i < MODEL_YEARS; i++) {
+  for (let i = 0; i < modelYears; i++) {
     const yearNum = i + 1;
     const calendarYear = START_YEAR + i;
 
     // Available nights
     const availableNights =
-      yearNum === 1 ? ROOMS * OPERATING_DAYS_YEAR1 : ROOMS * OPERATING_DAYS_FULL;
+      yearNum === 1 ? rooms * operatingDaysYear1 : rooms * operatingDaysFull;
 
     // Occupancy ramp: Year 1 = initial, Year 2 = midpoint, Year 3+ = mature
     let occupancy: number;
@@ -173,8 +180,8 @@ export function runScenario(inputs: ScenarioInputs): ScenarioResult {
   const lastNoi = projections[projections.length - 1].noi;
   const terminalValue = lastNoi / inputs.terminalCapRate;
 
-  // Cash flows for IRR: Year 0 = -investment, Years 1-9 = NOI, Year 10 = NOI + terminal
-  const cashFlows: number[] = [-INVESTMENT];
+  // Cash flows for IRR: Year 0 = -investment, Years 1-N = NOI, last year = NOI + terminal
+  const cashFlows: number[] = [-investment];
   for (let i = 0; i < projections.length; i++) {
     const cf =
       i === projections.length - 1
@@ -185,12 +192,12 @@ export function runScenario(inputs: ScenarioInputs): ScenarioResult {
 
   const irr = calculateIRR(cashFlows);
   const totalNoi = projections.reduce((sum, p) => sum + p.noi, 0);
-  const roi = (totalNoi - INVESTMENT) / INVESTMENT;
+  const roi = (totalNoi - investment) / investment;
 
   // Payback year: first year where cumulative NOI >= investment
   let paybackYear: number | null = null;
   for (const p of projections) {
-    if (p.cumulativeNoi >= INVESTMENT) {
+    if (p.cumulativeNoi >= investment) {
       paybackYear = p.year;
       break;
     }
@@ -198,7 +205,7 @@ export function runScenario(inputs: ScenarioInputs): ScenarioResult {
 
   // Year 3 stabilized total revenue per room
   const year3 = projections[2];
-  const totalRevenuePerRoom = year3 ? year3.totalRevenue / ROOMS : 0;
+  const totalRevenuePerRoom = year3 ? year3.totalRevenue / rooms : 0;
 
   const totalReturn = terminalValue + totalNoi;
 

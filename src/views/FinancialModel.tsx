@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   AreaChart,
   Area,
@@ -12,13 +12,23 @@ import {
   Legend,
   ReferenceLine,
 } from "recharts";
-import { Calculator, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  Calculator,
+  ChevronDown,
+  ChevronRight,
+  RotateCcw,
+} from "lucide-react";
 import {
   SCENARIOS,
   INVESTMENT,
+  ROOMS,
+  OPERATING_DAYS_FULL,
+  MODEL_YEARS,
   runScenario,
+  type ScenarioInputs,
   type ScenarioResult,
 } from "../lib/financial-model";
+import { SliderInput } from "../components/SliderInput";
 
 // ---------- Formatting Helpers ----------
 
@@ -46,7 +56,8 @@ const SCENARIO_STYLES = [
     bg: "bg-red-50",
     text: "text-red-700",
     badge: "bg-red-100 text-red-800",
-    chart: "#f87171", // red-400
+    headerBg: "bg-red-50",
+    chart: "#f87171",
   },
   {
     name: "Base",
@@ -54,7 +65,8 @@ const SCENARIO_STYLES = [
     bg: "bg-amber-50",
     text: "text-amber-700",
     badge: "bg-amber-100 text-amber-800",
-    chart: "#fbbf24", // amber-400
+    headerBg: "bg-amber-50",
+    chart: "#fbbf24",
   },
   {
     name: "Optimistic",
@@ -62,19 +74,58 @@ const SCENARIO_STYLES = [
     bg: "bg-emerald-50",
     text: "text-emerald-700",
     badge: "bg-emerald-100 text-emerald-800",
-    chart: "#10b981", // emerald-500
+    headerBg: "bg-emerald-50",
+    chart: "#10b981",
   },
 ];
 
 // ---------- Main Component ----------
 
 export function FinancialModel() {
-  const results = useMemo<ScenarioResult[]>(
-    () => SCENARIOS.map(runScenario),
+  // Editable global parameters
+  const [investment, setInvestment] = useState(INVESTMENT);
+  const [rooms, setRooms] = useState(ROOMS);
+  const [operatingDays, setOperatingDays] = useState(OPERATING_DAYS_FULL);
+  const [modelYears, setModelYears] = useState(MODEL_YEARS);
+
+  // Editable scenario inputs (deep clone defaults)
+  const [scenarioInputs, setScenarioInputs] = useState<ScenarioInputs[]>(
+    () => SCENARIOS.map((s) => ({ ...s })),
+  );
+
+  // Assumptions panel open/closed
+  const [assumptionsOpen, setAssumptionsOpen] = useState(true);
+
+  // Detailed projections accordion
+  const [expandedScenario, setExpandedScenario] = useState<number>(1);
+
+  // Helper to update a single field on one scenario
+  const updateScenario = useCallback(
+    (idx: number, field: keyof ScenarioInputs, value: number) => {
+      setScenarioInputs((prev) =>
+        prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+      );
+    },
     [],
   );
 
-  const [expandedScenario, setExpandedScenario] = useState<number>(1); // Base default
+  // Reset everything to defaults
+  const resetDefaults = useCallback(() => {
+    setScenarioInputs(SCENARIOS.map((s) => ({ ...s })));
+    setInvestment(INVESTMENT);
+    setRooms(ROOMS);
+    setOperatingDays(OPERATING_DAYS_FULL);
+    setModelYears(MODEL_YEARS);
+  }, []);
+
+  // Recalculate on any change
+  const results = useMemo<ScenarioResult[]>(
+    () =>
+      scenarioInputs.map((s) =>
+        runScenario(s, investment, rooms, operatingDays, modelYears),
+      ),
+    [scenarioInputs, investment, rooms, operatingDays, modelYears],
+  );
 
   // Cash flow chart data
   const cashFlowData = useMemo(() => {
@@ -97,6 +148,10 @@ export function FinancialModel() {
     }));
   }, [results]);
 
+  // Collapsed summary text (Base scenario values)
+  const base = scenarioInputs[1];
+  const collapsedSummary = `ADR €${base.adrYear1} | Occ ${(base.occupancyYear1 * 100).toFixed(0)}% | GOP ${(base.gopMargin * 100).toFixed(0)}% | Cap Rate ${(base.terminalCapRate * 100).toFixed(1)}% (Base)`;
+
   return (
     <div className="space-y-8">
       {/* A. Header */}
@@ -108,11 +163,315 @@ export function FinancialModel() {
           </h2>
         </div>
         <p className="text-stone-500 mt-1 ml-10">
-          10-year investment return analysis — 3 scenarios
+          {modelYears}-year investment return analysis — 3 scenarios
         </p>
       </div>
 
-      {/* B. Scenario Comparison Cards */}
+      {/* B. Adjust Assumptions Panel */}
+      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <button
+          onClick={() => setAssumptionsOpen(!assumptionsOpen)}
+          className="w-full flex items-center justify-between px-5 py-3 hover:bg-stone-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            {assumptionsOpen ? (
+              <ChevronDown size={16} className="text-stone-400" />
+            ) : (
+              <ChevronRight size={16} className="text-stone-400" />
+            )}
+            <h3 className="text-sm font-semibold text-stone-700">
+              Adjust Assumptions
+            </h3>
+          </div>
+          {!assumptionsOpen && (
+            <span className="text-xs text-stone-400 font-mono">
+              {collapsedSummary}
+            </span>
+          )}
+        </button>
+
+        {assumptionsOpen && (
+          <div className="px-5 pb-5 space-y-5">
+            {/* Reset button */}
+            <div className="flex justify-end">
+              <button
+                onClick={resetDefaults}
+                className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-700 px-3 py-1.5 rounded-lg border border-stone-200 hover:border-stone-300 transition-colors"
+              >
+                <RotateCcw size={12} />
+                Reset to Defaults
+              </button>
+            </div>
+
+            {/* Global Parameters */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-3">
+                Global Parameters
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs text-stone-500">
+                    Total Investment
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-stone-400">€</span>
+                    <input
+                      type="number"
+                      value={parseFloat((investment / 1_000_000).toFixed(2))}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v))
+                          setInvestment(
+                            Math.min(20_000_000, Math.max(5_000_000, v * 1_000_000)),
+                          );
+                      }}
+                      min={5}
+                      max={20}
+                      step={0.1}
+                      className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    />
+                    <span className="text-xs text-stone-400">M</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-stone-500">
+                    Number of Rooms
+                  </label>
+                  <input
+                    type="number"
+                    value={rooms}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value);
+                      if (!isNaN(v))
+                        setRooms(Math.min(100, Math.max(20, v)));
+                    }}
+                    min={20}
+                    max={100}
+                    step={1}
+                    className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-stone-500">
+                    Operating Days/Year
+                  </label>
+                  <input
+                    type="number"
+                    value={operatingDays}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value);
+                      if (!isNaN(v))
+                        setOperatingDays(Math.min(365, Math.max(90, v)));
+                    }}
+                    min={90}
+                    max={365}
+                    step={10}
+                    className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-stone-500">
+                    Model Duration
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={modelYears}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v))
+                          setModelYears(Math.min(20, Math.max(5, v)));
+                      }}
+                      min={5}
+                      max={20}
+                      step={1}
+                      className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    />
+                    <span className="text-xs text-stone-400">years</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-stone-100" />
+
+            {/* Per-scenario inputs: 3-column grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {scenarioInputs.map((scenario, idx) => {
+                const style = SCENARIO_STYLES[idx];
+                return (
+                  <div key={scenario.name} className="space-y-4">
+                    <h4
+                      className={`text-sm font-semibold ${style.text} px-2 py-1 rounded ${style.headerBg}`}
+                    >
+                      {scenario.name}
+                    </h4>
+
+                    {/* Revenue inputs */}
+                    <div className="space-y-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-300">
+                        Revenue
+                      </p>
+                      <SliderInput
+                        label="ADR Year 1"
+                        value={scenario.adrYear1}
+                        onChange={(v) =>
+                          updateScenario(idx, "adrYear1", v)
+                        }
+                        min={80}
+                        max={400}
+                        step={10}
+                        suffix="€"
+                        compact
+                      />
+                      <SliderInput
+                        label="Occupancy Year 1"
+                        value={parseFloat(
+                          (scenario.occupancyYear1 * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "occupancyYear1", v / 100)
+                        }
+                        min={20}
+                        max={90}
+                        step={1}
+                        suffix="%"
+                        compact
+                      />
+                      <SliderInput
+                        label="Mature Occupancy"
+                        value={parseFloat(
+                          (scenario.occupancyMature * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "occupancyMature", v / 100)
+                        }
+                        min={30}
+                        max={95}
+                        step={1}
+                        suffix="%"
+                        compact
+                      />
+                      <SliderInput
+                        label="ADR Annual Growth"
+                        value={parseFloat(
+                          (scenario.adrGrowth * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "adrGrowth", v / 100)
+                        }
+                        min={0}
+                        max={8}
+                        step={0.5}
+                        suffix="%"
+                        compact
+                      />
+                      <SliderInput
+                        label="F&B per Night"
+                        value={scenario.fbPerNight}
+                        onChange={(v) =>
+                          updateScenario(idx, "fbPerNight", v)
+                        }
+                        min={0}
+                        max={100}
+                        step={5}
+                        suffix="€"
+                        compact
+                      />
+                      <SliderInput
+                        label="Other Revenue"
+                        value={parseFloat(
+                          (scenario.otherRevenuePct * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "otherRevenuePct", v / 100)
+                        }
+                        min={0}
+                        max={25}
+                        step={1}
+                        suffix="%"
+                        compact
+                      />
+                    </div>
+
+                    {/* Cost inputs */}
+                    <div className="space-y-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-300">
+                        Costs
+                      </p>
+                      <SliderInput
+                        label="GOP Margin"
+                        value={parseFloat(
+                          (scenario.gopMargin * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "gopMargin", v / 100)
+                        }
+                        min={15}
+                        max={60}
+                        step={1}
+                        suffix="%"
+                        compact
+                      />
+                      <SliderInput
+                        label="CapEx Reserve"
+                        value={parseFloat(
+                          (scenario.capexReservePct * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "capexReservePct", v / 100)
+                        }
+                        min={1}
+                        max={10}
+                        step={0.5}
+                        suffix="%"
+                        compact
+                      />
+                      <SliderInput
+                        label="OpEx Growth"
+                        value={parseFloat(
+                          (scenario.opexGrowth * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "opexGrowth", v / 100)
+                        }
+                        min={0}
+                        max={6}
+                        step={0.5}
+                        suffix="%"
+                        compact
+                      />
+                    </div>
+
+                    {/* Exit inputs */}
+                    <div className="space-y-2.5">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-300">
+                        Exit
+                      </p>
+                      <SliderInput
+                        label="Terminal Cap Rate"
+                        value={parseFloat(
+                          (scenario.terminalCapRate * 100).toFixed(1),
+                        )}
+                        onChange={(v) =>
+                          updateScenario(idx, "terminalCapRate", v / 100)
+                        }
+                        min={4}
+                        max={12}
+                        step={0.5}
+                        suffix="%"
+                        compact
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* C. Scenario Comparison Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {results.map((result, i) => {
           const style = SCENARIO_STYLES[i];
@@ -150,13 +509,15 @@ export function FinancialModel() {
                   <p className="font-semibold text-stone-700">
                     {result.paybackYear
                       ? `${result.paybackYear}`
-                      : ">10 years"}
+                      : `>${modelYears} years`}
                   </p>
                 </div>
                 <div>
                   <p className="text-stone-400 text-xs">Yr 3 RevPAR</p>
                   <p className="font-semibold text-stone-700">
-                    €{result.projections[2].revpar.toFixed(0)}
+                    {result.projections[2]
+                      ? `€${result.projections[2].revpar.toFixed(0)}`
+                      : "N/A"}
                   </p>
                 </div>
                 <div>
@@ -169,86 +530,6 @@ export function FinancialModel() {
             </div>
           );
         })}
-      </div>
-
-      {/* C. Key Assumptions Table */}
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-stone-100">
-          <h3 className="text-sm font-semibold text-stone-700">
-            Key Assumptions
-          </h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-stone-100 bg-stone-50">
-                <th className="text-left px-5 py-2 text-stone-500 font-medium">
-                  Parameter
-                </th>
-                {SCENARIOS.map((s, i) => (
-                  <th
-                    key={s.name}
-                    className={`text-right px-5 py-2 font-medium ${SCENARIO_STYLES[i].text}`}
-                  >
-                    {s.name}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-stone-50">
-              {[
-                {
-                  label: "ADR Year 1",
-                  values: SCENARIOS.map((s) => `€${s.adrYear1}`),
-                },
-                {
-                  label: "Occupancy Year 1",
-                  values: SCENARIOS.map((s) => fmtPct(s.occupancyYear1, 0)),
-                },
-                {
-                  label: "Occupancy Mature (Yr 3+)",
-                  values: SCENARIOS.map((s) => fmtPct(s.occupancyMature, 0)),
-                },
-                {
-                  label: "ADR Annual Growth",
-                  values: SCENARIOS.map((s) => fmtPct(s.adrGrowth, 1)),
-                },
-                {
-                  label: "GOP Margin",
-                  values: SCENARIOS.map((s) => fmtPct(s.gopMargin, 0)),
-                },
-                {
-                  label: "F&B per Room Night",
-                  values: SCENARIOS.map((s) => `€${s.fbPerNight}`),
-                },
-                {
-                  label: "Other Revenue (% of Room)",
-                  values: SCENARIOS.map((s) => fmtPct(s.otherRevenuePct, 0)),
-                },
-                {
-                  label: "CapEx Reserve",
-                  values: SCENARIOS.map((s) => fmtPct(s.capexReservePct, 0)),
-                },
-                {
-                  label: "Terminal Cap Rate",
-                  values: SCENARIOS.map((s) => fmtPct(s.terminalCapRate, 1)),
-                },
-              ].map((row) => (
-                <tr key={row.label} className="hover:bg-stone-50/50">
-                  <td className="px-5 py-2 text-stone-600">{row.label}</td>
-                  {row.values.map((v, i) => (
-                    <td
-                      key={i}
-                      className="px-5 py-2 text-right font-mono text-stone-700"
-                    >
-                      {v}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       {/* D. Cash Flow Chart */}
@@ -271,12 +552,12 @@ export function FinancialModel() {
             />
             <Legend />
             <ReferenceLine
-              y={INVESTMENT / 1_000_000}
+              y={investment / 1_000_000}
               stroke="#78716c"
               strokeDasharray="6 4"
               strokeWidth={2}
               label={{
-                value: `Investment €${(INVESTMENT / 1_000_000).toFixed(1)}M`,
+                value: `Investment €${(investment / 1_000_000).toFixed(1)}M`,
                 position: "right",
                 fill: "#78716c",
                 fontSize: 11,
@@ -458,7 +739,7 @@ export function FinancialModel() {
                         </td>
                         <td
                           className={`px-3 py-2 text-right font-mono font-semibold ${
-                            p.cumulativeNoi >= 10_557_940
+                            p.cumulativeNoi >= investment
                               ? "text-emerald-600"
                               : "text-stone-700"
                           }`}
@@ -477,10 +758,11 @@ export function FinancialModel() {
 
       {/* G. Sensitivity Note */}
       <p className="text-xs text-stone-400 leading-relaxed">
-        Model assumes seasonal operation (180 days/year), no debt financing.
-        Terminal value calculated using NOI / Cap Rate method. IRR includes
-        terminal value at Year 10. Investment total: €10,557,940 excl. VAT.
-        Partial first year (2029): 120 operating days.
+        Model assumes seasonal operation ({operatingDays} days/year), no debt
+        financing. Terminal value calculated using NOI / Cap Rate method. IRR
+        includes terminal value at Year {modelYears}. Investment total:{" "}
+        {fmtEuroM(investment)} excl. VAT. Partial first year (2029):{" "}
+        {Math.round(operatingDays * (120 / 180))} operating days.
       </p>
     </div>
   );
