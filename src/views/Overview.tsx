@@ -66,41 +66,49 @@ export function Overview() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-stone-800">
-          {PROJECT_CONSTANTS.projectName}
-        </h2>
-        <p className="text-stone-500 text-sm mt-1">
-          {PROJECT_CONSTANTS.location}
-        </p>
-        <p className="text-stone-600 text-sm mt-1 font-medium">
-          {daysToOperation > 0
-            ? `${daysToOperation} days until operation`
-            : "Operational"}
-        </p>
+      {/* Hero Banner */}
+      <div className="relative rounded-2xl overflow-hidden -mx-8 -mt-8 mb-4">
+        <img
+          src="/hotel-aerial.jpg"
+          alt="Olive Press Hotel — Aerial view, Molyvos, Lesvos"
+          className="w-full h-56 object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        <div className="absolute bottom-0 left-0 p-8">
+          <h2 className="text-3xl font-bold text-white drop-shadow-lg">
+            {PROJECT_CONSTANTS.projectName}
+          </h2>
+          <p className="text-white/80 text-sm mt-1">
+            {PROJECT_CONSTANTS.location}
+          </p>
+          <p className="text-amber-300 text-sm mt-1 font-semibold">
+            {daysToOperation > 0
+              ? `${daysToOperation} days until operation`
+              : "Operational"}
+          </p>
+        </div>
       </div>
 
       {/* Overall Progress */}
       <div>
         <div className="flex justify-between text-sm text-stone-600 mb-1">
-          <span>Overall Progress</span>
-          <span>{overallProgress}%</span>
+          <span className="font-medium">Overall Progress</span>
+          <span className="font-semibold">{overallProgress}%</span>
         </div>
         <div className="w-full bg-stone-200 rounded-full h-3">
           <div
-            className="bg-green-600 h-3 rounded-full transition-all"
+            className="bg-emerald-600 h-3 rounded-full transition-all"
             style={{ width: `${overallProgress}%` }}
           />
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
-          label="Construction Cost / m²"
+          label="Construction Cost / m2"
           value={formatEuro(PROJECT_CONSTANTS.constructionCostPerSqm)}
-          subtitle={`${PROJECT_CONSTANTS.totalSqm.toLocaleString()} m² total`}
+          subtitle={`${PROJECT_CONSTANTS.totalSqm.toLocaleString()} m2 total`}
         />
         <KpiCard
           label="Rooms Completed"
@@ -119,7 +127,7 @@ export function Overview() {
       </div>
 
       {/* Budget Gauge */}
-      <div className="bg-white rounded-xl border border-stone-200 p-5">
+      <div className="bg-amber-50/40 rounded-xl border border-stone-200 p-5">
         <h3 className="text-sm font-medium text-stone-500 mb-3">
           Budget Utilisation
         </h3>
@@ -134,7 +142,7 @@ export function Overview() {
         <div className="w-full bg-stone-200 rounded-full h-4">
           <div
             className={`h-4 rounded-full transition-all ${
-              budgetPct > 100 ? "bg-red-500" : budgetPct > 80 ? "bg-amber-500" : "bg-blue-500"
+              budgetPct > 100 ? "bg-red-500" : budgetPct > 80 ? "bg-amber-500" : "bg-emerald-500"
             }`}
             style={{ width: `${Math.min(budgetPct, 100)}%` }}
           />
@@ -156,17 +164,17 @@ export function Overview() {
             {currentQActivities.map((a) => (
               <div key={a.id} className="flex items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-stone-700 truncate">
+                  <p className="text-sm font-medium text-stone-700" title={`${a.number}. ${a.name}`}>
                     {a.number}. {a.name}
                   </p>
                   <div className="w-full bg-stone-100 rounded-full h-2 mt-1">
                     <div
-                      className="bg-green-500 h-2 rounded-full"
+                      className="bg-emerald-500 h-2 rounded-full"
                       style={{ width: `${a.progress_pct}%` }}
                     />
                   </div>
                 </div>
-                <span className="text-xs text-stone-400 w-10 text-right">
+                <span className="text-xs text-stone-400 w-10 text-right shrink-0">
                   {a.progress_pct}%
                 </span>
                 <StatusBadge value={a.status} />
@@ -174,15 +182,6 @@ export function Overview() {
             ))}
           </div>
         )}
-      </div>
-
-      {/* Hotel aerial photo */}
-      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
-        <img
-          src="/hotel-aerial.jpg"
-          alt="Olive Press Hotel — Aerial view, Molyvos, Lesvos"
-          className="w-full h-64 object-cover"
-        />
       </div>
 
       {/* Masterplan */}

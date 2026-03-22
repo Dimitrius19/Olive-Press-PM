@@ -67,20 +67,28 @@ interface GanttChartProps {
 export function GanttChart({ children }: GanttChartProps) {
   return (
     <div className="overflow-x-auto">
-      <div className="min-w-[900px]">
-        {/* Quarter headers */}
-        <div className="relative h-8 border-b border-stone-200 mb-1">
-          {QUARTERS.map((q) => (
-            <div
-              key={q.label}
-              className="absolute top-0 h-full flex items-center border-l border-stone-200"
-              style={{ left: `${q.startPct}%`, width: `${q.widthPct}%` }}
-            >
-              <span className="text-[10px] text-stone-400 pl-1 truncate">
-                {q.label}
-              </span>
-            </div>
-          ))}
+      <div className="min-w-[1200px]">
+        {/* Header row with labels + quarter columns */}
+        <div className="flex items-center h-8 border-b border-stone-200 mb-1">
+          {/* Match the info columns in GanttRow */}
+          <div className="w-64 shrink-0" />
+          <div className="w-20 shrink-0" />
+          <div className="w-16 shrink-0" />
+
+          {/* Quarter headers in the bar area */}
+          <div className="flex-1 relative h-full">
+            {QUARTERS.map((q) => (
+              <div
+                key={q.label}
+                className="absolute top-0 h-full flex items-center border-l border-stone-200"
+                style={{ left: `${q.startPct}%`, width: `${q.widthPct}%` }}
+              >
+                <span className="text-[10px] text-stone-400 pl-1 truncate">
+                  {q.label}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Rows */}

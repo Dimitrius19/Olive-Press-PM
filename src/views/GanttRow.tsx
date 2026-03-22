@@ -3,7 +3,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { dayToPercent, durationToPercent } from "./GanttChart";
 
 const BAR_COLORS: Record<Activity["status"], string> = {
-  complete: "bg-green-500",
+  complete: "bg-emerald-500",
   in_progress: "bg-blue-500",
   not_started: "bg-stone-400",
 };
@@ -33,32 +33,28 @@ export function GanttRow({ activity, onStatusChange }: GanttRowProps) {
 
   return (
     <div className="flex items-center h-10 border-b border-stone-100 hover:bg-stone-50 group">
-      {/* Info section */}
-      <div className="w-56 shrink-0 flex items-center gap-2 px-2 overflow-hidden">
+      {/* Info section — activity name */}
+      <div className="w-64 shrink-0 flex items-center gap-2 px-2 overflow-hidden">
         <span className="text-xs text-stone-400 w-6 text-right shrink-0">
           {activity.number}
         </span>
-        <span className="text-xs text-stone-700 truncate flex-1">
+        <span
+          className="text-xs text-stone-700 truncate flex-1"
+          title={activity.name}
+        >
           {activity.name}
         </span>
       </div>
 
-      {/* Assigned */}
-      <div className="w-24 shrink-0 px-1">
-        <span className="text-[10px] text-stone-400 truncate block">
-          {activity.assigned_to}
-        </span>
-      </div>
-
       {/* Status badge - clickable */}
-      <div className="w-24 shrink-0 px-1">
+      <div className="w-20 shrink-0 px-1">
         <button onClick={cycleStatus} className="cursor-pointer">
           <StatusBadge value={activity.status} />
         </button>
       </div>
 
       {/* Progress */}
-      <div className="w-12 shrink-0 text-right pr-2">
+      <div className="w-16 shrink-0 text-right pr-2">
         <span className="text-[10px] text-stone-400">
           {activity.progress_pct}%
         </span>
