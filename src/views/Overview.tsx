@@ -176,6 +176,15 @@ export function Overview() {
         )}
       </div>
 
+      {/* Hotel aerial photo */}
+      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <img
+          src="/hotel-aerial.jpg"
+          alt="Olive Press Hotel — Aerial view, Molyvos, Lesvos"
+          className="w-full h-64 object-cover"
+        />
+      </div>
+
       {/* Masterplan */}
       {!imgError && (
         <div className="bg-white rounded-xl border border-stone-200 p-5">
