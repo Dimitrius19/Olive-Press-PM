@@ -39,6 +39,9 @@ export interface ScenarioResult {
   totalRevenuePerRoom: number;
   terminalValue: number;
   totalReturn: number;
+  yieldOnCost: number; // Stabilized NOI (Year 3) / Investment
+  cashOnCash: number; // Same as YoC when no debt
+  stabilizedNoi: number; // Year 3 NOI
 }
 
 export const SCENARIOS: ScenarioInputs[] = [
@@ -209,6 +212,12 @@ export function runScenario(
 
   const totalReturn = terminalValue + totalNoi;
 
+  // Yield on Cost = Stabilized NOI (Year 3) / Total Investment
+  const stabilizedYear = projections.length >= 3 ? projections[2] : projections[projections.length - 1];
+  const stabilizedNoi = stabilizedYear?.noi ?? 0;
+  const yieldOnCost = investment > 0 ? stabilizedNoi / investment : 0;
+  const cashOnCash = yieldOnCost; // Same when no debt financing
+
   return {
     inputs,
     projections,
@@ -218,5 +227,57 @@ export function runScenario(
     totalRevenuePerRoom,
     terminalValue,
     totalReturn,
+    yieldOnCost,
+    cashOnCash,
+    stabilizedNoi,
   };
+}
+
+// Reverse solve: what ADR is needed to hit a target Yield on Cost?
+export function solveAdrForTargetYield(
+  baseInputs: ScenarioInputs,
+  targetYield: number,
+  investment = INVESTMENT,
+  rooms = ROOMS,
+  operatingDaysFull = OPERATING_DAYS_FULL,
+  modelYears = MODEL_YEARS,
+): number {
+  // Binary search for ADR that produces the target YoC
+  let low = 50;
+  let high = 600;
+  for (let i = 0; i < 50; i++) {
+    const mid = (low + high) / 2;
+    const testInputs = { ...baseInputs, adrYear1: mid };
+    const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears);
+    if (result.yieldOnCost < targetYield) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+  return Math.round((low + high) / 2);
+}
+
+// Reverse solve: what occupancy is needed to hit a target Yield on Cost?
+export function solveOccupancyForTargetYield(
+  baseInputs: ScenarioInputs,
+  targetYield: number,
+  investment = INVESTMENT,
+  rooms = ROOMS,
+  operatingDaysFull = OPERATING_DAYS_FULL,
+  modelYears = MODEL_YEARS,
+): number {
+  let low = 0.1;
+  let high = 0.99;
+  for (let i = 0; i < 50; i++) {
+    const mid = (low + high) / 2;
+    const testInputs = { ...baseInputs, occupancyMature: mid, occupancyYear1: mid * 0.85 };
+    const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears);
+    if (result.yieldOnCost < targetYield) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+  return Math.round(((low + high) / 2) * 100);
 }

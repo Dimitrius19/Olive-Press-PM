@@ -25,6 +25,8 @@ import {
   OPERATING_DAYS_FULL,
   MODEL_YEARS,
   runScenario,
+  solveAdrForTargetYield,
+  solveOccupancyForTargetYield,
   type ScenarioInputs,
   type ScenarioResult,
 } from "../lib/financial-model";
@@ -80,6 +82,96 @@ const SCENARIO_STYLES = [
 ];
 
 // ---------- Main Component ----------
+
+// ---------- Target Yield Solver ----------
+
+function TargetYieldSolver({
+  baseInputs,
+  investment,
+  rooms,
+  operatingDays,
+  modelYears,
+}: {
+  baseInputs: ScenarioInputs;
+  investment: number;
+  rooms: number;
+  operatingDays: number;
+  modelYears: number;
+}) {
+  const [targetYield, setTargetYield] = useState(6);
+
+  const target = targetYield / 100;
+  const requiredAdr = useMemo(
+    () => solveAdrForTargetYield(baseInputs, target, investment, rooms, operatingDays, modelYears),
+    [baseInputs, target, investment, rooms, operatingDays, modelYears],
+  );
+  const requiredOcc = useMemo(
+    () => solveOccupancyForTargetYield(baseInputs, target, investment, rooms, operatingDays, modelYears),
+    [baseInputs, target, investment, rooms, operatingDays, modelYears],
+  );
+
+  const requiredNoi = investment * target;
+
+  return (
+    <div className="bg-gradient-to-br from-emerald-50/50 to-amber-50/30 rounded-xl border border-emerald-200/60 p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-stone-800">Target Yield Solver</h3>
+          <p className="text-xs text-stone-500">What does it take to hit your target return?</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-stone-600">Target Yield on Cost:</span>
+          <input
+            type="number"
+            value={targetYield}
+            onChange={(e) => setTargetYield(Number(e.target.value))}
+            min={1}
+            max={20}
+            step={0.5}
+            className="w-16 text-center text-lg font-bold text-emerald-700 border border-emerald-300 rounded-lg px-2 py-1 bg-white"
+          />
+          <span className="text-lg font-bold text-emerald-700">%</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg p-4 border border-stone-200/60">
+          <p className="text-xs text-stone-500 uppercase tracking-wide">Required Stabilized NOI</p>
+          <p className="text-2xl font-bold text-stone-800 mt-1">
+            €{(requiredNoi / 1000).toFixed(0)}K<span className="text-sm font-normal text-stone-400">/year</span>
+          </p>
+          <p className="text-xs text-stone-400 mt-1">= {targetYield}% × €{(investment / 1_000_000).toFixed(1)}M investment</p>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 border border-stone-200/60">
+          <p className="text-xs text-stone-500 uppercase tracking-wide">Required ADR</p>
+          <p className="text-2xl font-bold text-stone-800 mt-1">
+            €{requiredAdr}<span className="text-sm font-normal text-stone-400">/night</span>
+          </p>
+          <p className="text-xs text-stone-400 mt-1">
+            at {Math.round(baseInputs.occupancyMature * 100)}% occupancy, {Math.round(baseInputs.gopMargin * 100)}% GOP
+          </p>
+          <p className={`text-xs mt-1 ${requiredAdr <= 250 ? "text-emerald-600" : requiredAdr <= 350 ? "text-amber-600" : "text-red-600"}`}>
+            {requiredAdr <= 200 ? "Achievable" : requiredAdr <= 300 ? "Ambitious" : "Very challenging"} for Lesvos market
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg p-4 border border-stone-200/60">
+          <p className="text-xs text-stone-500 uppercase tracking-wide">Required Occupancy</p>
+          <p className="text-2xl font-bold text-stone-800 mt-1">
+            {requiredOcc}%<span className="text-sm font-normal text-stone-400"> mature</span>
+          </p>
+          <p className="text-xs text-stone-400 mt-1">
+            at €{baseInputs.adrYear1} ADR, {Math.round(baseInputs.gopMargin * 100)}% GOP
+          </p>
+          <p className={`text-xs mt-1 ${requiredOcc <= 65 ? "text-emerald-600" : requiredOcc <= 80 ? "text-amber-600" : "text-red-600"}`}>
+            {requiredOcc <= 60 ? "Achievable" : requiredOcc <= 75 ? "Ambitious" : requiredOcc <= 90 ? "Very challenging" : "Not feasible"} for seasonal operation
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function FinancialModel() {
   // Editable global parameters
@@ -527,12 +619,38 @@ export function FinancialModel() {
                   </p>
                 </div>
               </div>
+
+              <div className="mt-4 pt-3 border-t border-stone-200/60">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-stone-400">Yield on Cost</p>
+                    <p className={`text-xl font-bold ${result.yieldOnCost >= 0.06 ? "text-emerald-600" : result.yieldOnCost >= 0.04 ? "text-amber-600" : "text-red-600"}`}>
+                      {fmtPct(result.yieldOnCost)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-stone-400">Stabilized NOI</p>
+                    <p className="font-semibold text-stone-700 text-sm">
+                      {fmtEuroK(result.stabilizedNoi)}/yr
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* D. Cash Flow Chart */}
+      {/* D. Target Yield Solver */}
+      <TargetYieldSolver
+        baseInputs={scenarioInputs[1]}
+        investment={investment}
+        rooms={rooms}
+        operatingDays={operatingDays}
+        modelYears={modelYears}
+      />
+
+      {/* E. Cash Flow Chart */}
       <div className="bg-white rounded-xl border border-stone-200 p-5">
         <h3 className="text-sm font-semibold text-stone-700 mb-4">
           Cumulative Net Operating Income
