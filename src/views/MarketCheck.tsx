@@ -18,7 +18,16 @@ import {
   Info,
   ShieldCheck,
   Ruler,
+  Calculator,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+import {
+  generateEstimate,
+  KEY_VARIANCES,
+  type BoQCategory,
+  type BottomUpEstimate,
+} from "../lib/bottom-up-estimate";
 import { useMarketData, type MarketDataPoint } from "../hooks/useMarketData";
 import { useBudgetLines } from "../hooks/useBudget";
 import {
@@ -471,6 +480,22 @@ export function MarketCheck() {
     if (benchmarkResults.length === 0 || !budgetLines) return null;
     return summarizeBenchmarks(benchmarkResults, budgetLines.length);
   }, [benchmarkResults, budgetLines]);
+
+  // Bottom-up cost estimate
+  const bottomUpEstimate = useMemo<BottomUpEstimate>(() => generateEstimate(), []);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  function toggleCategory(name: string) {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  }
 
   // ---------- Render ----------
 
@@ -1261,6 +1286,264 @@ export function MarketCheck() {
           </Card>
         </>
       )}
+
+      {/* ===== Bottom-Up Cost Estimate ===== */}
+      <div className="pt-4 border-t border-stone-200">
+        <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
+          <Calculator size={24} className="text-emerald-600" />
+          Bottom-Up Cost Estimate
+        </h2>
+        <p className="text-sm text-stone-500 mt-1">
+          Independent estimate from physical quantities, challenging ANICON numbers from first principles
+        </p>
+      </div>
+
+      {/* Comparison Card */}
+      <div
+        className={`rounded-xl border p-5 ${
+          bottomUpEstimate.comparisonWithAnicon.deltaPct > 20
+            ? "border-amber-300 bg-amber-50/60"
+            : "border-emerald-200 bg-emerald-50/60"
+        }`}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* ANICON column */}
+          <div className="rounded-lg border border-stone-200 bg-white/70 p-4">
+            <p className="text-xs text-stone-400 uppercase tracking-wider font-semibold mb-3">
+              ANICON Estimate
+            </p>
+            <p className="text-3xl font-bold text-stone-800 font-mono">
+              {fmtEur(bottomUpEstimate.comparisonWithAnicon.aniconTotal)}
+            </p>
+            <p className="text-xs text-stone-500 mt-1">Excl. VAT | March 2026 report</p>
+          </div>
+          {/* Bottom-up column */}
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+            <p className="text-xs text-stone-400 uppercase tracking-wider font-semibold mb-3">
+              Bottom-Up Estimate
+            </p>
+            <p className="text-3xl font-bold text-emerald-800 font-mono">
+              {fmtEur(bottomUpEstimate.totalExclVat)}
+            </p>
+            <p className="text-xs text-stone-500 mt-1">
+              Excl. VAT | Incl. 10% contingency + 4% inflation
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 pt-4 border-t border-stone-200 flex items-center gap-3">
+          <AlertTriangle size={20} className="text-amber-600 shrink-0" />
+          <p className="text-sm text-stone-700">
+            The bottom-up estimate is{" "}
+            <span className="font-bold text-amber-700">
+              {fmtEur(bottomUpEstimate.comparisonWithAnicon.delta)} (
+              {bottomUpEstimate.comparisonWithAnicon.deltaPct.toFixed(0)}%) lower
+            </span>{" "}
+            than ANICON&apos;s sanity check. Key drivers: FF&E specification level,
+            pre-opening scope, and structural contingency assumptions.
+          </p>
+        </div>
+      </div>
+
+      {/* Summary Breakdown */}
+      <Card>
+        <CardTitle>Cost Summary</CardTitle>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div>
+            <p className="text-xs text-stone-400">Construction (1-7)</p>
+            <p className="text-lg font-bold text-stone-800 font-mono">
+              {fmtEur(bottomUpEstimate.constructionSubtotal)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-stone-400">OP II (8)</p>
+            <p className="text-lg font-bold text-stone-800 font-mono">
+              {fmtEur(bottomUpEstimate.opIISubtotal)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-stone-400">FF&E + OS&E (9-10)</p>
+            <p className="text-lg font-bold text-stone-800 font-mono">
+              {fmtEur(bottomUpEstimate.ffeSubtotal + bottomUpEstimate.oseSubtotal)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-stone-400">Soft Costs + Pre-Opening (11-12)</p>
+            <p className="text-lg font-bold text-stone-800 font-mono">
+              {fmtEur(bottomUpEstimate.softCostsSubtotal + bottomUpEstimate.preOpeningSubtotal)}
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-stone-200">
+          <div>
+            <p className="text-xs text-stone-400">Base Total</p>
+            <p className="text-sm font-bold text-stone-700 font-mono">
+              {fmtEur(bottomUpEstimate.baseTotal)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-stone-400">Contingency (10%)</p>
+            <p className="text-sm font-bold text-stone-700 font-mono">
+              {fmtEur(bottomUpEstimate.contingency)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-stone-400">Inflation (4%)</p>
+            <p className="text-sm font-bold text-stone-700 font-mono">
+              {fmtEur(bottomUpEstimate.inflation)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-stone-400">VAT (24%)</p>
+            <p className="text-sm font-bold text-stone-700 font-mono">
+              {fmtEur(bottomUpEstimate.vat)}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Category Breakdown Table */}
+      <Card>
+        <CardTitle>Detailed Bill of Quantities</CardTitle>
+        <div className="space-y-0">
+          {bottomUpEstimate.categories.map((cat: BoQCategory) => {
+            const isExpanded = expandedCategories.has(cat.name);
+            return (
+              <div key={cat.name} className="border-b border-stone-100 last:border-b-0">
+                <button
+                  onClick={() => toggleCategory(cat.name)}
+                  className="w-full flex items-center justify-between py-3 px-2 hover:bg-stone-50 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    {isExpanded ? (
+                      <ChevronDown size={16} className="text-stone-400" />
+                    ) : (
+                      <ChevronRight size={16} className="text-stone-400" />
+                    )}
+                    <span className="font-semibold text-sm text-stone-800">{cat.name}</span>
+                    <span className="text-xs text-stone-400">
+                      ({cat.lines.length} items)
+                    </span>
+                  </div>
+                  <span className="font-bold text-sm text-stone-800 font-mono">
+                    {fmtEur(cat.subtotal)}
+                  </span>
+                </button>
+                {isExpanded && (
+                  <div className="overflow-x-auto pb-3">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-stone-200 text-left">
+                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider">
+                            Description
+                          </th>
+                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-right">
+                            Qty
+                          </th>
+                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-center">
+                            Unit
+                          </th>
+                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-right">
+                            Rate
+                          </th>
+                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-right">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cat.lines.map((l) => (
+                          <tr
+                            key={l.id}
+                            className="border-b border-stone-50 hover:bg-stone-50/50"
+                          >
+                            <td className="py-1.5 px-2 text-stone-700">
+                              <div>{l.description}</div>
+                              <div className="text-[10px] text-stone-400">{l.notes}</div>
+                            </td>
+                            <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
+                              {l.unit === "ls"
+                                ? "1"
+                                : l.quantity.toLocaleString("en-IE")}
+                            </td>
+                            <td className="py-1.5 px-2 text-center text-stone-500 text-xs">
+                              {l.unit}
+                            </td>
+                            <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
+                              {l.unit === "ls"
+                                ? "--"
+                                : fmtEur(l.unitRate)}
+                            </td>
+                            <td className="py-1.5 px-2 text-right tabular-nums text-stone-800 font-mono font-semibold">
+                              {fmtEur(l.total)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {/* Grand total row */}
+          <div className="flex items-center justify-between py-3 px-2 border-t-2 border-stone-300 bg-stone-50/50">
+            <span className="font-bold text-stone-800">
+              Total (excl. contingency, inflation, VAT)
+            </span>
+            <span className="font-bold text-lg text-stone-800 font-mono">
+              {fmtEur(bottomUpEstimate.baseTotal)}
+            </span>
+          </div>
+        </div>
+      </Card>
+
+      {/* Key Differences */}
+      <Card>
+        <CardTitle>Key Differences vs ANICON</CardTitle>
+        <div className="space-y-3">
+          {KEY_VARIANCES.map((v) => (
+            <div
+              key={v.category}
+              className="rounded-lg border border-stone-200 bg-white/60 p-3"
+            >
+              <div className="flex items-start justify-between mb-1">
+                <span className="font-semibold text-sm text-stone-800">{v.category}</span>
+                <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-mono">
+                  {fmtEur(v.delta)} gap
+                </span>
+              </div>
+              <div className="flex gap-4 text-xs text-stone-500 mb-2">
+                <span>
+                  Bottom-up: <span className="font-semibold text-stone-700 font-mono">{fmtEur(v.bottomUp)}</span>
+                </span>
+                <span>
+                  ANICON: <span className="font-semibold text-stone-700 font-mono">{fmtEur(v.anicon)}</span>
+                </span>
+              </div>
+              <p className="text-xs text-stone-600">{v.explanation}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Methodology Note */}
+      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+        <div className="flex items-start gap-2">
+          <Info size={16} className="text-stone-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider mb-1">
+              Methodology
+            </p>
+            <p className="text-xs text-stone-500 leading-relaxed">
+              Bottom-up estimate based on physical quantities from ANICON architectural report
+              (March 2026), multiplied by current Greek construction unit rates (PEDMEDE/ATEE
+              2025-2026, +15% island logistics premium). Quantities are estimated from available
+              drawings and may differ from final design. This estimate is indicative — a full
+              BoQ requires detailed design drawings.
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Footer */}
       <p className="text-[11px] text-stone-400 text-center">
