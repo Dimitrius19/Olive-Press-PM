@@ -1361,6 +1361,16 @@ export function MarketCheck() {
                 and site knowledge. Differences between the two estimates highlight areas for further
                 discussion during the detailed design phase.
               </p>
+              <p className="text-sm text-stone-600 leading-relaxed mt-3">
+                <strong>Note:</strong> ANICON themselves describe their report as
+                a &ldquo;High Level Sanity Check&rdquo; (Χονδρική Εκτίμηση)
+                based on incomplete technical data, without site visit or design
+                team consultation. They explicitly recommend updating the
+                estimate after Application Studies are complete. The gap between
+                our bottom-up estimate and ANICON&apos;s figures partly reflects
+                ANICON&apos;s intentional conservatism given these data
+                limitations.
+              </p>
             </div>
           </div>
 

@@ -38,17 +38,36 @@ export function BudgetRow({ line, onActualChange }: BudgetRowProps) {
     }
   }, [localActual, line.id, line.actual_amount, onActualChange]);
 
+  const isStructural = /structural|foundation|θεμελ|στατικ/i.test(
+    line.description,
+  );
+
   return (
-    <tr className="border-b border-stone-100 hover:bg-stone-50">
+    <tr
+      className={`border-b border-stone-100 ${
+        line.flagged
+          ? "bg-amber-50/60 hover:bg-amber-100/60"
+          : "hover:bg-stone-50"
+      }`}
+    >
       <td className="py-2 px-3 text-sm text-stone-700">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {line.description}
           {line.flagged && (
-            <span className="bg-amber-100 text-amber-800 text-[10px] font-semibold px-1.5 py-0.5 rounded">
+            <span
+              className="bg-amber-200 text-amber-900 text-[10px] font-semibold px-1.5 py-0.5 rounded cursor-help"
+              title="Unit price reviewed by ANICON — marked for verification"
+            >
               REVIEW
             </span>
           )}
         </div>
+        {isStructural && (
+          <p className="text-[11px] text-stone-500 mt-0.5 italic">
+            Includes &euro;250K provisional allocation (agreed with Mr. Alatzas)
+            pending detailed structural survey
+          </p>
+        )}
       </td>
       <td className="py-2 px-3 text-sm text-stone-600 text-right">
         {formatEuro(line.original_estimate)}

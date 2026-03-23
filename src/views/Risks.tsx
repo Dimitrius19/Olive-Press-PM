@@ -1,8 +1,45 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRisks, useCreateRisk, useUpdateRisk } from "../hooks/useRisks";
 import { StatusBadge } from "../components/StatusBadge";
 import { RiskDetail } from "./RiskDetail";
 import type { Risk } from "../lib/types";
+
+/** Risks that ANICON flagged — seeded automatically if not already present. */
+const ANICON_SEED_RISKS: {
+  matchTitle: RegExp;
+  data: Omit<Risk, "id" | "created_at" | "resolved_at">;
+}[] = [
+  {
+    matchTitle: /insurance/i,
+    data: {
+      title: "Insurance contributions not budgeted",
+      description:
+        "ANICON flagged that insurance cost provisions need to be added. No estimate provided yet.",
+      category: "cost",
+      severity: "medium",
+      probability: "high",
+      status: "open",
+      owner: "DT",
+      action_items: [],
+      resolution_notes: null,
+    },
+  },
+  {
+    matchTitle: /competitive.tendering|contractor.procurement/i,
+    data: {
+      title: "Competitive tendering assumptions",
+      description:
+        "Budget assumes competitive general contractor procurement. Unit prices must include general expenses and contractor profit margin.",
+      category: "cost",
+      severity: "low",
+      probability: "high",
+      status: "open",
+      owner: "DT",
+      action_items: [],
+      resolution_notes: null,
+    },
+  },
+];
 
 type FilterStatus = "all" | Risk["status"];
 
@@ -13,6 +50,19 @@ export function Risks() {
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Seed ANICON-flagged risks if they don't already exist
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!risks || seeded.current) return;
+    seeded.current = true;
+    for (const seed of ANICON_SEED_RISKS) {
+      const exists = risks.some((r) => seed.matchTitle.test(r.title));
+      if (!exists) {
+        createRisk.mutate(seed.data);
+      }
+    }
+  }, [risks, createRisk]);
 
   const counts = useMemo(() => {
     if (!risks) return { open: 0, mitigating: 0 };
