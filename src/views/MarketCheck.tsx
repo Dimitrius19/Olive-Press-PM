@@ -17,10 +17,10 @@ import {
   XCircle,
   Info,
   ShieldCheck,
-  Ruler,
   Calculator,
   ChevronDown,
   ChevronRight,
+  Scale,
 } from "lucide-react";
 import {
   generateEstimate,
@@ -66,6 +66,17 @@ const ANICON = {
 // Benchmarks
 const COST_PER_SQM_RANGE = { min: 950, max: 2200 };
 const COST_PER_ROOM_RANGE = { min: 150_000, max: 300_000 };
+
+// ---------- Tab Configuration ----------
+
+const MARKET_TABS = [
+  { key: "indices", label: "Market Indices", icon: TrendingUp },
+  { key: "validation", label: "Budget Validation", icon: ShieldCheck },
+  { key: "benchmarks", label: "Unit Rate Benchmarks", icon: Scale },
+  { key: "bottomup", label: "Bottom-Up Estimate", icon: Calculator },
+] as const;
+
+type TabKey = (typeof MARKET_TABS)[number]["key"];
 
 // ---------- Helpers ----------
 
@@ -149,14 +160,20 @@ function Card({
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border border-stone-200 bg-amber-50/40 p-6 ${className}`}>
+    <div
+      className={`rounded-xl border border-stone-200 bg-amber-50/40 p-6 transition-shadow hover:shadow-sm ${className}`}
+    >
       {children}
     </div>
   );
 }
 
-function CardTitle({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-sm font-semibold text-stone-700 uppercase tracking-wider mb-4">{children}</h3>;
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="border-l-4 border-emerald-500 pl-3 text-sm font-semibold text-stone-700 tracking-wide mb-4">
+      {children}
+    </h3>
+  );
 }
 
 function RangeBar({
@@ -356,6 +373,8 @@ export function MarketCheck() {
   const { data, isLoading, error } = useMarketData();
   const { data: budgetLines } = useBudgetLines();
   const [midpoint, setMidpoint] = useState("2027-Q2");
+  const [activeTab, setActiveTab] = useState<TabKey>("indices");
+  const [benchmarkTableOpen, setBenchmarkTableOpen] = useState(false);
 
   const analysis = useMemo(() => {
     if (!data) return null;
@@ -548,277 +567,296 @@ export function MarketCheck() {
         </div>
       )}
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Inflation Validation */}
-        <Card>
-          <CardTitle>Inflation Validation</CardTitle>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-stone-500">ANICON assumption</span>
-              <span className="font-bold text-stone-800">{ANICON.inflationAssumption}%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-stone-500">CPI YoY (FRED)</span>
-              <span className="font-semibold text-stone-700">
-                {analysis?.cpiGrowth != null ? `${fmt(analysis.cpiGrowth)}%` : "N/A"}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-stone-500">Construction Cost Index YoY</span>
-              <span className="font-semibold text-stone-700">
-                {analysis?.cciGrowth != null ? `${fmt(analysis.cciGrowth)}%` : "N/A"}
-              </span>
-            </div>
-            <div className="border-t border-stone-200 pt-3 flex items-center gap-2">
-              <TrafficDot color={analysis?.inflationSignal ?? "unknown"} />
-              <span className={`text-sm font-medium ${trafficTextColors[analysis?.inflationSignal ?? "unknown"]}`}>
-                {analysis?.inflationSignal === "green" && "Within budget assumption"}
-                {analysis?.inflationSignal === "amber" && "Slightly above assumption"}
-                {analysis?.inflationSignal === "red" && "Exceeds budget assumption"}
-                {(analysis?.inflationSignal === "unknown" || !analysis) && "Data unavailable"}
-              </span>
-            </div>
-          </div>
-        </Card>
-
-        {/* Construction Cost Benchmark */}
-        <Card>
-          <CardTitle>Construction Cost / m2</CardTitle>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-stone-500">ANICON estimate</span>
-              <span className="font-bold text-stone-800">{fmtEur(ANICON.constructionCostPerSqm)}/m2</span>
-            </div>
-            <div className="text-xs text-stone-400">
-              4-star hotel renovation range (Greece)
-            </div>
-            <RangeBar
-              value={ANICON.constructionCostPerSqm}
-              min={COST_PER_SQM_RANGE.min}
-              max={COST_PER_SQM_RANGE.max}
-              label="ANICON"
-            />
-            <p className="text-xs text-stone-400 mt-4 flex items-start gap-1">
-              <Info size={12} className="mt-0.5 shrink-0" />
-              Heritage/preserved buildings typically 30-50% above standard construction
-            </p>
-          </div>
-        </Card>
-
-        {/* Cost Per Room Benchmark */}
-        <Card>
-          <CardTitle>Cost Per Room</CardTitle>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-stone-500">ANICON estimate</span>
-              <span className="font-bold text-stone-800">{fmtEur(ANICON.costPerRoom)}/room</span>
-            </div>
-            <div className="text-xs text-stone-400">
-              European 4-star hotel renovation benchmark
-            </div>
-            <RangeBar
-              value={ANICON.costPerRoom}
-              min={COST_PER_ROOM_RANGE.min}
-              max={COST_PER_ROOM_RANGE.max}
-              label="ANICON"
-            />
-            <p className="text-xs text-stone-400 mt-4">
-              {ANICON.totalRooms} rooms | Total budget: {fmtEur(ANICON.totalBudget)}
-            </p>
-          </div>
-        </Card>
-      </div>
-
-      {/* Construction Cost Index Chart */}
-      {chartData.length > 0 && (
-        <Card>
-          <CardTitle>Greece Construction Cost Index Trend</CardTitle>
-          <p className="text-xs text-stone-400 mb-4">
-            Base 2015 = 100 | Dashed line: ANICON 4% annual projection from report date
-          </p>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: "#78716c" }}
-                  angle={-45}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis tick={{ fontSize: 11, fill: "#78716c" }} domain={["auto", "auto"]} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#fafaf9",
-                    border: "1px solid #d6d3d1",
-                    borderRadius: "8px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Legend />
-                <ReferenceLine
-                  x={ANICON.reportDate.replace("-", "-Q1 ").length > 0 ? undefined : undefined}
-                  stroke="#78716c"
-                  strokeDasharray="3 3"
-                  label=""
-                />
-                <Line
-                  type="monotone"
-                  dataKey="actual"
-                  stroke="#059669"
-                  strokeWidth={2}
-                  dot={{ fill: "#059669", r: 3 }}
-                  connectNulls={false}
-                  name="Actual"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="projected"
-                  stroke="#a8a29e"
-                  strokeWidth={2}
-                  strokeDasharray="6 3"
-                  dot={{ fill: "#a8a29e", r: 3 }}
-                  connectNulls={false}
-                  name="4% Projection"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Card>
-      )}
-
-      {/* Material Price Alerts */}
-      <Card>
-        <CardTitle>Material Price Alerts</CardTitle>
-        {analysis?.matGrowth != null ? (
-          <div className="space-y-3">
-            <div
-              className={`flex items-center gap-3 rounded-lg border p-3 ${
-                analysis.materialAlert
-                  ? "border-red-200 bg-red-50"
-                  : "border-emerald-200 bg-emerald-50"
+      {/* Tab Bar */}
+      <div className="flex gap-1 rounded-xl bg-stone-100 p-1">
+        {MARKET_TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all flex-1 justify-center ${
+                isActive
+                  ? "bg-white text-emerald-700 shadow-sm"
+                  : "text-stone-500 hover:text-stone-700 hover:bg-stone-50"
               }`}
             >
-              {analysis.materialAlert ? (
-                <AlertTriangle size={18} className="text-red-500" />
-              ) : (
-                <CheckCircle size={18} className="text-emerald-500" />
-              )}
-              <div>
-                <p className="text-sm font-medium text-stone-800">
-                  Overall Material Input Prices: {fmt(analysis.matGrowth)}% YoY
-                </p>
-                <p className="text-xs text-stone-500">
-                  {analysis.materialAlert
-                    ? "Material costs have moved significantly since budget preparation"
-                    : "Material costs remain within expected range"}
+              <Icon size={16} />
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ===== Tab: Market Indices ===== */}
+      {activeTab === "indices" && (
+        <div className="space-y-6">
+          {/* Row 1: Inflation + Cost/m2 side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Inflation Validation */}
+            <Card>
+              <SectionTitle>Inflation Validation</SectionTitle>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-stone-500">ANICON assumption</span>
+                  <span className="font-bold text-stone-800 tabular-nums">{ANICON.inflationAssumption}%</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-stone-500">CPI YoY (FRED)</span>
+                  <span className="font-semibold text-stone-700 tabular-nums">
+                    {analysis?.cpiGrowth != null ? `${fmt(analysis.cpiGrowth)}%` : "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-stone-500">Construction Cost Index YoY</span>
+                  <span className="font-semibold text-stone-700 tabular-nums">
+                    {analysis?.cciGrowth != null ? `${fmt(analysis.cciGrowth)}%` : "N/A"}
+                  </span>
+                </div>
+                <div className="border-t border-stone-200 pt-3 flex items-center gap-2">
+                  <TrafficDot color={analysis?.inflationSignal ?? "unknown"} />
+                  <span className={`text-sm font-medium ${trafficTextColors[analysis?.inflationSignal ?? "unknown"]}`}>
+                    {analysis?.inflationSignal === "green" && "Within budget assumption"}
+                    {analysis?.inflationSignal === "amber" && "Slightly above assumption"}
+                    {analysis?.inflationSignal === "red" && "Exceeds budget assumption"}
+                    {(analysis?.inflationSignal === "unknown" || !analysis) && "Data unavailable"}
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Construction Cost Benchmark */}
+            <Card>
+              <SectionTitle>Construction Cost / m2</SectionTitle>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-stone-500">ANICON estimate</span>
+                  <span className="font-bold text-stone-800 tabular-nums">{fmtEur(ANICON.constructionCostPerSqm)}/m2</span>
+                </div>
+                <div className="text-xs text-stone-400">
+                  4-star hotel renovation range (Greece)
+                </div>
+                <RangeBar
+                  value={ANICON.constructionCostPerSqm}
+                  min={COST_PER_SQM_RANGE.min}
+                  max={COST_PER_SQM_RANGE.max}
+                  label="ANICON"
+                />
+                <p className="text-xs text-stone-400 mt-4 flex items-start gap-1">
+                  <Info size={12} className="mt-0.5 shrink-0" />
+                  Heritage/preserved buildings typically 30-50% above standard construction
                 </p>
               </div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-              {[
-                { name: "Overall", icon: TrendingUp },
-                { name: "Steel/Metal", icon: TrendingUp },
-                { name: "Concrete/Minerals", icon: TrendingUp },
-                { name: "Wood/Insulation", icon: TrendingUp },
-                { name: "Electromechanical", icon: TrendingUp },
-              ].map((cat) => (
-                <div
-                  key={cat.name}
-                  className="rounded-lg border border-stone-200 bg-white/60 p-2 text-center"
-                >
-                  <p className="text-stone-400 text-[10px] uppercase tracking-wide">{cat.name}</p>
-                  <p className="font-semibold text-stone-600 mt-0.5">
-                    {cat.name === "Overall" && analysis.matGrowth != null
-                      ? `${fmt(analysis.matGrowth)}%`
-                      : "--"}
+            </Card>
+          </div>
+
+          {/* Row 2: Cost Per Room + Summary Verdict side by side */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Cost Per Room Benchmark */}
+            <Card>
+              <SectionTitle>Cost Per Room</SectionTitle>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-stone-500">ANICON estimate</span>
+                  <span className="font-bold text-stone-800 tabular-nums">{fmtEur(ANICON.costPerRoom)}/room</span>
+                </div>
+                <div className="text-xs text-stone-400">
+                  European 4-star hotel renovation benchmark
+                </div>
+                <RangeBar
+                  value={ANICON.costPerRoom}
+                  min={COST_PER_ROOM_RANGE.min}
+                  max={COST_PER_ROOM_RANGE.max}
+                  label="ANICON"
+                />
+                <p className="text-xs text-stone-400 mt-4 tabular-nums">
+                  {ANICON.totalRooms} rooms | Total budget: {fmtEur(ANICON.totalBudget)}
+                </p>
+              </div>
+            </Card>
+
+            {/* Summary Verdict */}
+            <Card
+              className={`${
+                analysis?.verdict === "REASONABLE"
+                  ? trafficBgColors.green
+                  : analysis?.verdict === "AT RISK"
+                    ? trafficBgColors.red
+                    : analysis?.verdict === "NEEDS REVIEW"
+                      ? trafficBgColors.amber
+                      : trafficBgColors.unknown
+              }`}
+            >
+              <SectionTitle>Summary Verdict</SectionTitle>
+              <div className="flex items-center gap-3">
+                {analysis?.verdict === "REASONABLE" && (
+                  <CheckCircle size={24} className="text-emerald-600 shrink-0" />
+                )}
+                {analysis?.verdict === "AT RISK" && <XCircle size={24} className="text-red-600 shrink-0" />}
+                {analysis?.verdict === "NEEDS REVIEW" && (
+                  <AlertTriangle size={24} className="text-amber-600 shrink-0" />
+                )}
+                {!analysis && <Info size={24} className="text-stone-400 shrink-0" />}
+                <div>
+                  <p className="text-lg font-bold text-stone-800">
+                    Budget appears{" "}
+                    <span
+                      className={
+                        analysis?.verdict === "REASONABLE"
+                          ? "text-emerald-700"
+                          : analysis?.verdict === "AT RISK"
+                            ? "text-red-700"
+                            : analysis?.verdict === "NEEDS REVIEW"
+                              ? "text-amber-700"
+                              : "text-stone-500"
+                      }
+                    >
+                      {analysis?.verdict ?? "UNKNOWN"}
+                    </span>
+                  </p>
+                  <p className="text-sm text-stone-500 mt-1">
+                    Based on: inflation delta (
+                    {analysis?.inflationSignal === "green"
+                      ? "within range"
+                      : analysis?.inflationSignal === "amber"
+                        ? "slightly above"
+                        : analysis?.inflationSignal === "red"
+                          ? "exceeds assumption"
+                          : "unknown"}
+                    ), cost/m2 at {analysis ? `${Math.round(analysis.sqmPos)}%` : "--"} of benchmark
+                    range, cost/room at {analysis ? `${Math.round(analysis.roomPos)}%` : "--"} of
+                    benchmark range
                   </p>
                 </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-stone-400">
-              Note: Detailed category breakdown requires individual Eurostat series. Only overall index is fetched.
-            </p>
+              </div>
+            </Card>
           </div>
-        ) : (
-          <p className="text-sm text-stone-400">
-            Material price data unavailable. Eurostat API may be blocked by CORS.
-          </p>
-        )}
-      </Card>
 
-      {/* Summary Verdict */}
-      <Card
-        className={`${
-          analysis?.verdict === "REASONABLE"
-            ? trafficBgColors.green
-            : analysis?.verdict === "AT RISK"
-              ? trafficBgColors.red
-              : analysis?.verdict === "NEEDS REVIEW"
-                ? trafficBgColors.amber
-                : trafficBgColors.unknown
-        }`}
-      >
-        <CardTitle>Summary Verdict</CardTitle>
-        <div className="flex items-center gap-3">
-          {analysis?.verdict === "REASONABLE" && (
-            <CheckCircle size={24} className="text-emerald-600" />
+          {/* Material Price Alerts — full width */}
+          <Card>
+            <SectionTitle>Material Price Alerts</SectionTitle>
+            {analysis?.matGrowth != null ? (
+              <div className="space-y-3">
+                <div
+                  className={`flex items-center gap-3 rounded-lg border p-3 ${
+                    analysis.materialAlert
+                      ? "border-red-200 bg-red-50"
+                      : "border-emerald-200 bg-emerald-50"
+                  }`}
+                >
+                  {analysis.materialAlert ? (
+                    <AlertTriangle size={18} className="text-red-500" />
+                  ) : (
+                    <CheckCircle size={18} className="text-emerald-500" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-stone-800">
+                      Overall Material Input Prices: {fmt(analysis.matGrowth)}% YoY
+                    </p>
+                    <p className="text-xs text-stone-500">
+                      {analysis.materialAlert
+                        ? "Material costs have moved significantly since budget preparation"
+                        : "Material costs remain within expected range"}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
+                  {[
+                    { name: "Overall", icon: TrendingUp },
+                    { name: "Steel/Metal", icon: TrendingUp },
+                    { name: "Concrete/Minerals", icon: TrendingUp },
+                    { name: "Wood/Insulation", icon: TrendingUp },
+                    { name: "Electromechanical", icon: TrendingUp },
+                  ].map((cat) => (
+                    <div
+                      key={cat.name}
+                      className="rounded-lg border border-stone-200 bg-white/60 p-2 text-center"
+                    >
+                      <p className="text-stone-400 text-[10px] tracking-wide">{cat.name}</p>
+                      <p className="font-semibold text-stone-600 mt-0.5 tabular-nums">
+                        {cat.name === "Overall" && analysis.matGrowth != null
+                          ? `${fmt(analysis.matGrowth)}%`
+                          : "--"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-stone-400">
+                  Note: Detailed category breakdown requires individual Eurostat series. Only overall index is fetched.
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-stone-400">
+                Material price data unavailable. Eurostat API may be blocked by CORS.
+              </p>
+            )}
+          </Card>
+
+          {/* Construction Cost Index Chart — full width */}
+          {chartData.length > 0 && (
+            <Card>
+              <SectionTitle>Greece Construction Cost Index Trend</SectionTitle>
+              <p className="text-xs text-stone-400 mb-4">
+                Base 2015 = 100 | Dashed line: ANICON 4% annual projection from report date
+              </p>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11, fill: "#78716c" }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis tick={{ fontSize: 11, fill: "#78716c" }} domain={["auto", "auto"]} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#fafaf9",
+                        border: "1px solid #d6d3d1",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Legend />
+                    <ReferenceLine
+                      x={ANICON.reportDate.replace("-", "-Q1 ").length > 0 ? undefined : undefined}
+                      stroke="#78716c"
+                      strokeDasharray="3 3"
+                      label=""
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="actual"
+                      stroke="#059669"
+                      strokeWidth={2}
+                      dot={{ fill: "#059669", r: 3 }}
+                      connectNulls={false}
+                      name="Actual"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="projected"
+                      stroke="#a8a29e"
+                      strokeWidth={2}
+                      strokeDasharray="6 3"
+                      dot={{ fill: "#a8a29e", r: 3 }}
+                      connectNulls={false}
+                      name="4% Projection"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
           )}
-          {analysis?.verdict === "AT RISK" && <XCircle size={24} className="text-red-600" />}
-          {analysis?.verdict === "NEEDS REVIEW" && (
-            <AlertTriangle size={24} className="text-amber-600" />
-          )}
-          {!analysis && <Info size={24} className="text-stone-400" />}
-          <div>
-            <p className="text-lg font-bold text-stone-800">
-              Budget appears{" "}
-              <span
-                className={
-                  analysis?.verdict === "REASONABLE"
-                    ? "text-emerald-700"
-                    : analysis?.verdict === "AT RISK"
-                      ? "text-red-700"
-                      : analysis?.verdict === "NEEDS REVIEW"
-                        ? "text-amber-700"
-                        : "text-stone-500"
-                }
-              >
-                {analysis?.verdict ?? "UNKNOWN"}
-              </span>
-            </p>
-            <p className="text-sm text-stone-500 mt-1">
-              Based on: inflation delta (
-              {analysis?.inflationSignal === "green"
-                ? "within range"
-                : analysis?.inflationSignal === "amber"
-                  ? "slightly above"
-                  : analysis?.inflationSignal === "red"
-                    ? "exceeds assumption"
-                    : "unknown"}
-              ), cost/m2 at {analysis ? `${Math.round(analysis.sqmPos)}%` : "--"} of benchmark
-              range, cost/room at {analysis ? `${Math.round(analysis.roomPos)}%` : "--"} of
-              benchmark range
-            </p>
-          </div>
         </div>
-      </Card>
+      )}
 
-      {/* ===== Budget Line Validation ===== */}
-      {validatedLines && budgetSummary && (
-        <>
-          {/* Section Header */}
-          <div className="pt-4 border-t border-stone-200">
-            <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-              <ShieldCheck size={24} className="text-emerald-600" />
-              Budget Line Validation
-            </h2>
-            <p className="text-sm text-stone-500 mt-1">
-              Each budget line mapped to a relevant price index and time-adjusted to construction midpoint
-            </p>
-          </div>
-
+      {/* ===== Tab: Budget Validation ===== */}
+      {activeTab === "validation" && validatedLines && budgetSummary && (
+        <div className="space-y-6">
           {/* Summary Bar */}
           <div
             className={`rounded-xl border p-5 ${
@@ -831,27 +869,27 @@ export function MarketCheck() {
           >
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">ANICON Budget</p>
-                <p className="text-xl font-bold text-stone-800 mt-1">
+                <p className="text-xs text-stone-400 tracking-wider">ANICON Budget</p>
+                <p className="text-xl font-bold text-stone-800 mt-1 tabular-nums">
                   &euro;{fmtK(budgetSummary.totalAnicon)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">Time-Adjusted Total</p>
-                <p className="text-xl font-bold text-stone-800 mt-1">
+                <p className="text-xs text-stone-400 tracking-wider">Time-Adjusted Total</p>
+                <p className="text-xl font-bold text-stone-800 mt-1 tabular-nums">
                   &euro;{fmtK(budgetSummary.totalAdjusted)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">Total Exposure</p>
-                <p className="text-xl font-bold text-stone-800 mt-1">
+                <p className="text-xs text-stone-400 tracking-wider">Total Exposure</p>
+                <p className="text-xl font-bold text-stone-800 mt-1 tabular-nums">
                   +&euro;{fmtK(budgetSummary.totalDelta)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">Exposure %</p>
+                <p className="text-xs text-stone-400 tracking-wider">Exposure %</p>
                 <p
-                  className={`text-xl font-bold mt-1 ${
+                  className={`text-xl font-bold mt-1 tabular-nums ${
                     Math.abs(budgetSummary.deltaPct) > 0.05
                       ? "text-red-700"
                       : Math.abs(budgetSummary.deltaPct) > 0.02
@@ -865,51 +903,49 @@ export function MarketCheck() {
             </div>
           </div>
 
-          {/* Construction Midpoint Selector */}
-          <div className="flex items-center gap-3">
-            <label className="text-sm font-medium text-stone-600">
-              Construction spending midpoint:
-            </label>
-            <select
-              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-              value={midpoint}
-              onChange={(e) => setMidpoint(e.target.value)}
-            >
-              {MIDPOINT_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                  {opt === "2027-Q2" ? " (default)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Risk Heatmap Table */}
+          {/* Risk Heatmap Table with inline midpoint selector */}
           <Card>
-            <CardTitle>Risk Heatmap</CardTitle>
+            <div className="flex items-center justify-between mb-4">
+              <SectionTitle>Risk Heatmap</SectionTitle>
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-stone-500">Midpoint:</label>
+                <select
+                  className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                  value={midpoint}
+                  onChange={(e) => setMidpoint(e.target.value)}
+                >
+                  {MIDPOINT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                      {opt === "2027-Q2" ? " (default)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-stone-200 text-left">
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider">
                       Budget Line
                     </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
                       ANICON Est.
                     </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider">
                       Index
                     </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
                       YoY Growth
                     </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
                       Adjusted Est.
                     </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
                       Delta
                     </th>
-                    <th className="py-2 text-xs font-semibold text-stone-500 uppercase tracking-wider text-center">
+                    <th className="py-2 text-xs font-semibold text-stone-500 tracking-wider text-center">
                       Risk
                     </th>
                   </tr>
@@ -955,7 +991,7 @@ export function MarketCheck() {
             </p>
           </Card>
 
-          {/* Inflation Scenario Cards */}
+          {/* Inflation Scenario Cards in a 3-column grid */}
           {scenarios && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {scenarios.map((s) => (
@@ -968,9 +1004,9 @@ export function MarketCheck() {
                   }
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <CardTitle>If {s.label}</CardTitle>
+                    <SectionTitle>If {s.label}</SectionTitle>
                     {s.isAnicon && (
-                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full uppercase">
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
                         ANICON assumption
                       </span>
                     )}
@@ -978,18 +1014,18 @@ export function MarketCheck() {
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-stone-500">Adjusted total</span>
-                      <span className="font-bold text-stone-800">&euro;{fmtK(s.totalAdjusted)}</span>
+                      <span className="font-bold text-stone-800 tabular-nums">&euro;{fmtK(s.totalAdjusted)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-stone-500">Delta from budget</span>
-                      <span className="font-semibold text-stone-700">
+                      <span className="font-semibold text-stone-700 tabular-nums">
                         +&euro;{fmtK(s.totalDelta)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-stone-500">Increase</span>
                       <span
-                        className={`font-semibold ${
+                        className={`font-semibold tabular-nums ${
                           s.rate > 0.05
                             ? "text-red-700"
                             : s.rate > 0.03
@@ -1005,25 +1041,20 @@ export function MarketCheck() {
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
 
-      {/* ===== Unit Rate Benchmarking ===== */}
-      {benchmarkResults.length > 0 && benchmarkSummary && (
-        <>
-          {/* Section Header */}
-          <div className="pt-4 border-t border-stone-200">
-            <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-              <Ruler size={24} className="text-emerald-600" />
-              Unit Rate Benchmarking
-            </h2>
-            <p className="text-sm text-stone-500 mt-1">
-              Comparing ANICON estimates against Greek construction market rates
-              (PEDMEDE/ATEE 2025)
-            </p>
-          </div>
+      {/* Budget Validation empty state */}
+      {activeTab === "validation" && (!validatedLines || !budgetSummary) && (
+        <div className="flex items-center justify-center h-40 text-stone-400 text-sm">
+          Budget validation data is not yet available.
+        </div>
+      )}
 
-          {/* Overall Assessment */}
+      {/* ===== Tab: Unit Rate Benchmarks ===== */}
+      {activeTab === "benchmarks" && benchmarkResults.length > 0 && benchmarkSummary && (
+        <div className="space-y-6">
+          {/* Overall Assessment — at the top */}
           <div
             className={`rounded-xl border p-5 ${
               benchmarkSummary.netPosition === "accurate"
@@ -1035,38 +1066,38 @@ export function MarketCheck() {
           >
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                <p className="text-xs text-stone-400 tracking-wider">
                   Lines Matched
                 </p>
-                <p className="text-xl font-bold text-stone-800 mt-1">
+                <p className="text-xl font-bold text-stone-800 mt-1 tabular-nums">
                   {benchmarkSummary.matchedCount} of{" "}
                   {benchmarkSummary.totalLines}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                <p className="text-xs text-stone-400 tracking-wider">
                   Within Market Range
                 </p>
-                <p className="text-xl font-bold text-emerald-700 mt-1">
+                <p className="text-xl font-bold text-emerald-700 mt-1 tabular-nums">
                   {benchmarkSummary.withinRangeCount} of{" "}
                   {benchmarkSummary.matchedCount}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                <p className="text-xs text-stone-400 tracking-wider">
                   Potential Overbudgeting
                 </p>
-                <p className="text-xl font-bold text-amber-700 mt-1">
+                <p className="text-xl font-bold text-amber-700 mt-1 tabular-nums">
                   {benchmarkSummary.totalOverbudgeted > 0
                     ? `€${fmtK(benchmarkSummary.totalOverbudgeted)}`
                     : "—"}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                <p className="text-xs text-stone-400 tracking-wider">
                   Potential Underbudgeting
                 </p>
-                <p className="text-xl font-bold text-red-700 mt-1">
+                <p className="text-xl font-bold text-red-700 mt-1 tabular-nums">
                   {benchmarkSummary.totalUnderbudgeted > 0
                     ? `€${fmtK(benchmarkSummary.totalUnderbudgeted)}`
                     : "—"}
@@ -1102,7 +1133,7 @@ export function MarketCheck() {
             </div>
           </div>
 
-          {/* Benchmark Cards */}
+          {/* Benchmark Cards — 2-column grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {benchmarkResults.map((r) => {
               const verdictClasses = r.verdictColor.split(" ");
@@ -1129,7 +1160,7 @@ export function MarketCheck() {
                   <div className="grid grid-cols-2 gap-3 text-sm mb-3">
                     <div>
                       <p className="text-xs text-stone-400">ANICON Total</p>
-                      <p className="font-bold text-stone-800">
+                      <p className="font-bold text-stone-800 tabular-nums">
                         {fmtEur(r.line.anicon_revised)}
                       </p>
                     </div>
@@ -1137,7 +1168,7 @@ export function MarketCheck() {
                       <p className="text-xs text-stone-400">
                         Implied Unit Rate
                       </p>
-                      <p className="font-bold text-stone-800">
+                      <p className="font-bold text-stone-800 tabular-nums">
                         {r.benchmark.unit === "% of construction"
                           ? `${r.impliedRate.toFixed(1)}%`
                           : r.benchmark.unit === "€/lump"
@@ -1187,363 +1218,376 @@ export function MarketCheck() {
             })}
           </div>
 
-          {/* Summary Table */}
+          {/* Summary Table — collapsible */}
           <Card>
-            <CardTitle>Benchmark Summary</CardTitle>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-stone-200 text-left">
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">
-                      Line
-                    </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
-                      ANICON
-                    </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
-                      Unit Rate
-                    </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
-                      Market Mid
-                    </th>
-                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
-                      Position
-                    </th>
-                    <th className="py-2 text-xs font-semibold text-stone-500 uppercase tracking-wider text-center">
-                      Verdict
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {benchmarkResults.map((r) => {
-                    const verdictClasses = r.verdictColor.split(" ");
-                    const textClass = verdictClasses[0] || "";
-                    return (
-                      <tr
-                        key={r.benchmark.id + r.line.id}
-                        className="border-b border-stone-100"
-                      >
-                        <td className="py-2 pr-3">
-                          <div className="font-medium text-stone-700 truncate max-w-[200px]">
-                            {r.line.description}
-                          </div>
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
-                          {fmtEur(r.line.anicon_revised)}
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
-                          {r.benchmark.unit === "% of construction"
-                            ? `${r.impliedRate.toFixed(1)}%`
-                            : fmtEur(r.impliedRate)}
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
-                          {r.benchmark.unit === "% of construction"
-                            ? `${r.benchmark.midRange}%`
-                            : fmtEur(r.benchmark.midRange)}
-                        </td>
-                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
-                          {Math.round(r.positionInRange)}%
-                        </td>
-                        <td className="py-2 text-center">
-                          <span
-                            className={`text-[10px] font-semibold ${textClass}`}
-                          >
-                            {r.verdictLabel}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {/* Totals row */}
-                  <tr className="border-t-2 border-stone-300 font-bold">
-                    <td className="py-2 pr-3 text-stone-800">Total Benchmarked</td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-stone-800">
-                      {fmtEur(benchmarkSummary.totalBenchmarked)}
-                    </td>
-                    <td className="py-2 pr-3 text-right text-stone-500" colSpan={2}>
-                      Weighted avg position
-                    </td>
-                    <td className="py-2 pr-3 text-right tabular-nums text-stone-800">
-                      {Math.round(benchmarkSummary.weightedPosition)}%
-                    </td>
-                    <td className="py-2 text-center">
-                      <span
-                        className={`text-[10px] font-semibold ${
-                          benchmarkSummary.netPosition === "accurate"
-                            ? "text-emerald-700"
-                            : benchmarkSummary.netPosition === "aggressive"
-                              ? "text-red-700"
-                              : "text-amber-700"
-                        }`}
-                      >
-                        {benchmarkSummary.netPosition.toUpperCase()}
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </Card>
-        </>
-      )}
-
-      {/* ===== Bottom-Up Cost Estimate ===== */}
-      <div className="pt-4 border-t border-stone-200">
-        <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
-          <Calculator size={24} className="text-emerald-600" />
-          Bottom-Up Cost Estimate
-        </h2>
-        <p className="text-sm text-stone-500 mt-1">
-          Independent estimate from physical quantities, challenging ANICON numbers from first principles
-        </p>
-      </div>
-
-      {/* Comparison Card */}
-      <div
-        className={`rounded-xl border p-5 ${
-          bottomUpEstimate.comparisonWithAnicon.deltaPct > 20
-            ? "border-amber-300 bg-amber-50/60"
-            : "border-emerald-200 bg-emerald-50/60"
-        }`}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* ANICON column */}
-          <div className="rounded-lg border border-stone-200 bg-white/70 p-4">
-            <p className="text-xs text-stone-400 uppercase tracking-wider font-semibold mb-3">
-              ANICON Estimate
-            </p>
-            <p className="text-3xl font-bold text-stone-800 font-mono">
-              {fmtEur(bottomUpEstimate.comparisonWithAnicon.aniconTotal)}
-            </p>
-            <p className="text-xs text-stone-500 mt-1">Excl. VAT | March 2026 report</p>
-          </div>
-          {/* Bottom-up column */}
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
-            <p className="text-xs text-stone-400 uppercase tracking-wider font-semibold mb-3">
-              Bottom-Up Estimate
-            </p>
-            <p className="text-3xl font-bold text-emerald-800 font-mono">
-              {fmtEur(bottomUpEstimate.totalExclVat)}
-            </p>
-            <p className="text-xs text-stone-500 mt-1">
-              Excl. VAT | Incl. 10% contingency + 4% inflation
-            </p>
-          </div>
-        </div>
-        <div className="mt-4 pt-4 border-t border-stone-200 flex items-center gap-3">
-          <AlertTriangle size={20} className="text-amber-600 shrink-0" />
-          <p className="text-sm text-stone-700">
-            The bottom-up estimate is{" "}
-            <span className="font-bold text-amber-700">
-              {fmtEur(bottomUpEstimate.comparisonWithAnicon.delta)} (
-              {bottomUpEstimate.comparisonWithAnicon.deltaPct.toFixed(0)}%) lower
-            </span>{" "}
-            than ANICON&apos;s sanity check. Key drivers: FF&E specification level,
-            pre-opening scope, and structural contingency assumptions.
-          </p>
-        </div>
-      </div>
-
-      {/* Summary Breakdown */}
-      <Card>
-        <CardTitle>Cost Summary</CardTitle>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-          <div>
-            <p className="text-xs text-stone-400">Construction (1-7)</p>
-            <p className="text-lg font-bold text-stone-800 font-mono">
-              {fmtEur(bottomUpEstimate.constructionSubtotal)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-stone-400">OP II (8)</p>
-            <p className="text-lg font-bold text-stone-800 font-mono">
-              {fmtEur(bottomUpEstimate.opIISubtotal)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-stone-400">FF&E + OS&E (9-10)</p>
-            <p className="text-lg font-bold text-stone-800 font-mono">
-              {fmtEur(bottomUpEstimate.ffeSubtotal + bottomUpEstimate.oseSubtotal)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-stone-400">Soft Costs + Pre-Opening (11-12)</p>
-            <p className="text-lg font-bold text-stone-800 font-mono">
-              {fmtEur(bottomUpEstimate.softCostsSubtotal + bottomUpEstimate.preOpeningSubtotal)}
-            </p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-stone-200">
-          <div>
-            <p className="text-xs text-stone-400">Base Total</p>
-            <p className="text-sm font-bold text-stone-700 font-mono">
-              {fmtEur(bottomUpEstimate.baseTotal)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-stone-400">Contingency (10%)</p>
-            <p className="text-sm font-bold text-stone-700 font-mono">
-              {fmtEur(bottomUpEstimate.contingency)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-stone-400">Inflation (4%)</p>
-            <p className="text-sm font-bold text-stone-700 font-mono">
-              {fmtEur(bottomUpEstimate.inflation)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-stone-400">VAT (24%)</p>
-            <p className="text-sm font-bold text-stone-700 font-mono">
-              {fmtEur(bottomUpEstimate.vat)}
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      {/* Category Breakdown Table */}
-      <Card>
-        <CardTitle>Detailed Bill of Quantities</CardTitle>
-        <div className="space-y-0">
-          {bottomUpEstimate.categories.map((cat: BoQCategory) => {
-            const isExpanded = expandedCategories.has(cat.name);
-            return (
-              <div key={cat.name} className="border-b border-stone-100 last:border-b-0">
-                <button
-                  onClick={() => toggleCategory(cat.name)}
-                  className="w-full flex items-center justify-between py-3 px-2 hover:bg-stone-50 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-2">
-                    {isExpanded ? (
-                      <ChevronDown size={16} className="text-stone-400" />
-                    ) : (
-                      <ChevronRight size={16} className="text-stone-400" />
-                    )}
-                    <span className="font-semibold text-sm text-stone-800">{cat.name}</span>
-                    <span className="text-xs text-stone-400">
-                      ({cat.lines.length} items)
-                    </span>
-                  </div>
-                  <span className="font-bold text-sm text-stone-800 font-mono">
-                    {fmtEur(cat.subtotal)}
-                  </span>
-                </button>
-                {isExpanded && (
-                  <div className="overflow-x-auto pb-3">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-stone-200 text-left">
-                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider">
-                            Description
-                          </th>
-                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-right">
-                            Qty
-                          </th>
-                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-center">
-                            Unit
-                          </th>
-                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-right">
-                            Rate
-                          </th>
-                          <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider text-right">
-                            Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cat.lines.map((l) => (
-                          <tr
-                            key={l.id}
-                            className="border-b border-stone-50 hover:bg-stone-50/50"
-                          >
-                            <td className="py-1.5 px-2 text-stone-700">
-                              <div>{l.description}</div>
-                              <div className="text-[10px] text-stone-400">{l.notes}</div>
-                            </td>
-                            <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
-                              {l.unit === "ls"
-                                ? "1"
-                                : l.quantity.toLocaleString("en-IE")}
-                            </td>
-                            <td className="py-1.5 px-2 text-center text-stone-500 text-xs">
-                              {l.unit}
-                            </td>
-                            <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
-                              {l.unit === "ls"
-                                ? "--"
-                                : fmtEur(l.unitRate)}
-                            </td>
-                            <td className="py-1.5 px-2 text-right tabular-nums text-stone-800 font-mono font-semibold">
-                              {fmtEur(l.total)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+            <button
+              onClick={() => setBenchmarkTableOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between"
+            >
+              <SectionTitle>Benchmark Summary</SectionTitle>
+              <div className="flex items-center gap-1 text-xs text-stone-500">
+                {benchmarkTableOpen ? "Hide" : "Show"} table
+                {benchmarkTableOpen ? (
+                  <ChevronDown size={14} />
+                ) : (
+                  <ChevronRight size={14} />
                 )}
               </div>
-            );
-          })}
-          {/* Grand total row */}
-          <div className="flex items-center justify-between py-3 px-2 border-t-2 border-stone-300 bg-stone-50/50">
-            <span className="font-bold text-stone-800">
-              Total (excl. contingency, inflation, VAT)
-            </span>
-            <span className="font-bold text-lg text-stone-800 font-mono">
-              {fmtEur(bottomUpEstimate.baseTotal)}
-            </span>
-          </div>
+            </button>
+            {benchmarkTableOpen && (
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-stone-200 text-left">
+                      <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider">
+                        Line
+                      </th>
+                      <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
+                        ANICON
+                      </th>
+                      <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
+                        Unit Rate
+                      </th>
+                      <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
+                        Market Mid
+                      </th>
+                      <th className="py-2 pr-3 text-xs font-semibold text-stone-500 tracking-wider text-right">
+                        Position
+                      </th>
+                      <th className="py-2 text-xs font-semibold text-stone-500 tracking-wider text-center">
+                        Verdict
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {benchmarkResults.map((r) => {
+                      const verdictClasses = r.verdictColor.split(" ");
+                      const textClass = verdictClasses[0] || "";
+                      return (
+                        <tr
+                          key={r.benchmark.id + r.line.id}
+                          className="border-b border-stone-100"
+                        >
+                          <td className="py-2 pr-3">
+                            <div className="font-medium text-stone-700 truncate max-w-[200px]">
+                              {r.line.description}
+                            </div>
+                          </td>
+                          <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                            {fmtEur(r.line.anicon_revised)}
+                          </td>
+                          <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                            {r.benchmark.unit === "% of construction"
+                              ? `${r.impliedRate.toFixed(1)}%`
+                              : fmtEur(r.impliedRate)}
+                          </td>
+                          <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                            {r.benchmark.unit === "% of construction"
+                              ? `${r.benchmark.midRange}%`
+                              : fmtEur(r.benchmark.midRange)}
+                          </td>
+                          <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                            {Math.round(r.positionInRange)}%
+                          </td>
+                          <td className="py-2 text-center">
+                            <span
+                              className={`text-[10px] font-semibold ${textClass}`}
+                            >
+                              {r.verdictLabel}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {/* Totals row */}
+                    <tr className="border-t-2 border-stone-300 font-bold">
+                      <td className="py-2 pr-3 text-stone-800">Total Benchmarked</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-stone-800">
+                        {fmtEur(benchmarkSummary.totalBenchmarked)}
+                      </td>
+                      <td className="py-2 pr-3 text-right text-stone-500" colSpan={2}>
+                        Weighted avg position
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-stone-800">
+                        {Math.round(benchmarkSummary.weightedPosition)}%
+                      </td>
+                      <td className="py-2 text-center">
+                        <span
+                          className={`text-[10px] font-semibold ${
+                            benchmarkSummary.netPosition === "accurate"
+                              ? "text-emerald-700"
+                              : benchmarkSummary.netPosition === "aggressive"
+                                ? "text-red-700"
+                                : "text-amber-700"
+                          }`}
+                        >
+                          {benchmarkSummary.netPosition.toUpperCase()}
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
-      </Card>
+      )}
 
-      {/* Key Differences */}
-      <Card>
-        <CardTitle>Key Differences vs ANICON</CardTitle>
-        <div className="space-y-3">
-          {KEY_VARIANCES.map((v) => (
-            <div
-              key={v.category}
-              className="rounded-lg border border-stone-200 bg-white/60 p-3"
-            >
-              <div className="flex items-start justify-between mb-1">
-                <span className="font-semibold text-sm text-stone-800">{v.category}</span>
-                <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-mono">
-                  {fmtEur(v.delta)} gap
-                </span>
+      {/* Benchmarks empty state */}
+      {activeTab === "benchmarks" && (benchmarkResults.length === 0 || !benchmarkSummary) && (
+        <div className="flex items-center justify-center h-40 text-stone-400 text-sm">
+          Benchmark data is not yet available.
+        </div>
+      )}
+
+      {/* ===== Tab: Bottom-Up Estimate ===== */}
+      {activeTab === "bottomup" && (
+        <div className="space-y-6">
+          {/* Comparison Card — side by side */}
+          <div
+            className={`rounded-xl border p-5 ${
+              bottomUpEstimate.comparisonWithAnicon.deltaPct > 20
+                ? "border-amber-300 bg-amber-50/60"
+                : "border-emerald-200 bg-emerald-50/60"
+            }`}
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* ANICON column */}
+              <div className="rounded-lg border border-stone-200 bg-white/70 p-4">
+                <p className="text-xs text-stone-400 tracking-wider font-semibold mb-3">
+                  ANICON Estimate
+                </p>
+                <p className="text-3xl font-bold text-stone-800 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.comparisonWithAnicon.aniconTotal)}
+                </p>
+                <p className="text-xs text-stone-500 mt-1">Excl. VAT | March 2026 report</p>
               </div>
-              <div className="flex gap-4 text-xs text-stone-500 mb-2">
-                <span>
-                  Bottom-up: <span className="font-semibold text-stone-700 font-mono">{fmtEur(v.bottomUp)}</span>
-                </span>
-                <span>
-                  ANICON: <span className="font-semibold text-stone-700 font-mono">{fmtEur(v.anicon)}</span>
-                </span>
+              {/* Bottom-up column */}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+                <p className="text-xs text-stone-400 tracking-wider font-semibold mb-3">
+                  Bottom-Up Estimate
+                </p>
+                <p className="text-3xl font-bold text-emerald-800 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.totalExclVat)}
+                </p>
+                <p className="text-xs text-stone-500 mt-1">
+                  Excl. VAT | Incl. 10% contingency + 4% inflation
+                </p>
               </div>
-              <p className="text-xs text-stone-600">{v.explanation}</p>
             </div>
-          ))}
-        </div>
-      </Card>
+            <div className="mt-4 pt-4 border-t border-stone-200 flex items-center gap-3">
+              <AlertTriangle size={20} className="text-amber-600 shrink-0" />
+              <p className="text-sm text-stone-700">
+                The bottom-up estimate is{" "}
+                <span className="font-bold text-amber-700">
+                  {fmtEur(bottomUpEstimate.comparisonWithAnicon.delta)} (
+                  {bottomUpEstimate.comparisonWithAnicon.deltaPct.toFixed(0)}%) lower
+                </span>{" "}
+                than ANICON&apos;s sanity check. Key drivers: FF&E specification level,
+                pre-opening scope, and structural contingency assumptions.
+              </p>
+            </div>
+          </div>
 
-      {/* Methodology Note */}
-      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-        <div className="flex items-start gap-2">
-          <Info size={16} className="text-stone-400 mt-0.5 shrink-0" />
+          {/* Cost Summary — compact 4-column grid */}
+          <Card>
+            <SectionTitle>Cost Summary</SectionTitle>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-stone-400">Construction (1-7)</p>
+                <p className="text-lg font-bold text-stone-800 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.constructionSubtotal)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400">OP II (8)</p>
+                <p className="text-lg font-bold text-stone-800 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.opIISubtotal)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400">FF&E + OS&E (9-10)</p>
+                <p className="text-lg font-bold text-stone-800 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.ffeSubtotal + bottomUpEstimate.oseSubtotal)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400">Soft Costs + Pre-Opening (11-12)</p>
+                <p className="text-lg font-bold text-stone-800 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.softCostsSubtotal + bottomUpEstimate.preOpeningSubtotal)}
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-3 border-t border-stone-200">
+              <div>
+                <p className="text-xs text-stone-400">Base Total</p>
+                <p className="text-sm font-bold text-stone-700 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.baseTotal)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400">Contingency (10%)</p>
+                <p className="text-sm font-bold text-stone-700 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.contingency)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400">Inflation (4%)</p>
+                <p className="text-sm font-bold text-stone-700 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.inflation)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400">VAT (24%)</p>
+                <p className="text-sm font-bold text-stone-700 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.vat)}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Key Differences — 2-column card grid */}
           <div>
-            <p className="text-xs font-semibold text-stone-600 uppercase tracking-wider mb-1">
-              Methodology
-            </p>
-            <p className="text-xs text-stone-500 leading-relaxed">
-              Bottom-up estimate based on physical quantities from ANICON architectural report
-              (March 2026), multiplied by current Greek construction unit rates (PEDMEDE/ATEE
-              2025-2026, +15% island logistics premium). Quantities are estimated from available
-              drawings and may differ from final design. This estimate is indicative — a full
-              BoQ requires detailed design drawings.
-            </p>
+            <SectionTitle>Key Differences vs ANICON</SectionTitle>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {KEY_VARIANCES.map((v) => (
+                <Card key={v.category}>
+                  <div className="flex items-start justify-between mb-1">
+                    <span className="font-semibold text-sm text-stone-800">{v.category}</span>
+                    <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full font-mono tabular-nums">
+                      {fmtEur(v.delta)} gap
+                    </span>
+                  </div>
+                  <div className="flex gap-4 text-xs text-stone-500 mb-2">
+                    <span>
+                      Bottom-up: <span className="font-semibold text-stone-700 font-mono tabular-nums">{fmtEur(v.bottomUp)}</span>
+                    </span>
+                    <span>
+                      ANICON: <span className="font-semibold text-stone-700 font-mono tabular-nums">{fmtEur(v.anicon)}</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-600">{v.explanation}</p>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Detailed Bill of Quantities — categories collapsed by default */}
+          <Card>
+            <SectionTitle>Detailed Bill of Quantities</SectionTitle>
+            <div className="space-y-0">
+              {bottomUpEstimate.categories.map((cat: BoQCategory) => {
+                const isExpanded = expandedCategories.has(cat.name);
+                return (
+                  <div key={cat.name} className="border-b border-stone-100 last:border-b-0">
+                    <button
+                      onClick={() => toggleCategory(cat.name)}
+                      className="w-full flex items-center justify-between py-3 px-2 hover:bg-stone-50 transition-colors text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        {isExpanded ? (
+                          <ChevronDown size={16} className="text-stone-400" />
+                        ) : (
+                          <ChevronRight size={16} className="text-stone-400" />
+                        )}
+                        <span className="font-semibold text-sm text-stone-800">{cat.name}</span>
+                        <span className="text-xs text-stone-400">
+                          ({cat.lines.length} items)
+                        </span>
+                      </div>
+                      <span className="font-bold text-sm text-stone-800 font-mono tabular-nums">
+                        {fmtEur(cat.subtotal)}
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="overflow-x-auto pb-3">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-stone-200 text-left">
+                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider">
+                                Description
+                              </th>
+                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
+                                Qty
+                              </th>
+                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-center">
+                                Unit
+                              </th>
+                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
+                                Rate
+                              </th>
+                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
+                                Total
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cat.lines.map((l) => (
+                              <tr
+                                key={l.id}
+                                className="border-b border-stone-50 hover:bg-stone-50/50"
+                              >
+                                <td className="py-1.5 px-2 text-stone-700">
+                                  <div>{l.description}</div>
+                                  <div className="text-[10px] text-stone-400">{l.notes}</div>
+                                </td>
+                                <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
+                                  {l.unit === "ls"
+                                    ? "1"
+                                    : l.quantity.toLocaleString("en-IE")}
+                                </td>
+                                <td className="py-1.5 px-2 text-center text-stone-500 text-xs">
+                                  {l.unit}
+                                </td>
+                                <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
+                                  {l.unit === "ls"
+                                    ? "--"
+                                    : fmtEur(l.unitRate)}
+                                </td>
+                                <td className="py-1.5 px-2 text-right tabular-nums text-stone-800 font-mono font-semibold">
+                                  {fmtEur(l.total)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {/* Grand total row */}
+              <div className="flex items-center justify-between py-3 px-2 border-t-2 border-stone-300 bg-stone-50/50">
+                <span className="font-bold text-stone-800">
+                  Total (excl. contingency, inflation, VAT)
+                </span>
+                <span className="font-bold text-lg text-stone-800 font-mono tabular-nums">
+                  {fmtEur(bottomUpEstimate.baseTotal)}
+                </span>
+              </div>
+            </div>
+          </Card>
+
+          {/* Methodology Note */}
+          <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+            <div className="flex items-start gap-2">
+              <Info size={16} className="text-stone-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-stone-600 tracking-wider mb-1">
+                  Methodology
+                </p>
+                <p className="text-xs text-stone-500 leading-relaxed">
+                  Bottom-up estimate based on physical quantities from ANICON architectural report
+                  (March 2026), multiplied by current Greek construction unit rates (PEDMEDE/ATEE
+                  2025-2026, +15% island logistics premium). Quantities are estimated from available
+                  drawings and may differ from final design. This estimate is indicative — a full
+                  BoQ requires detailed design drawings.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Footer */}
       <p className="text-[11px] text-stone-400 text-center">
