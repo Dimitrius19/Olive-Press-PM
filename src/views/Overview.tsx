@@ -1,11 +1,18 @@
 import { useMemo, useState } from "react";
-import { KpiCard } from "../components/KpiCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { PROJECT_CONSTANTS } from "../data/seed";
 import { useActivities } from "../hooks/useActivities";
 import { useBudgetLines } from "../hooks/useBudget";
 import { useRisks } from "../hooks/useRisks";
 import { useDocuments } from "../hooks/useDocuments";
+import {
+  Building2,
+  CalendarClock,
+  ShieldAlert,
+  FileText,
+  Banknote,
+  TrendingUp,
+} from "lucide-react";
 
 function daysUntil(dateStr: string): number {
   const target = new Date(dateStr);
@@ -19,6 +26,13 @@ function currentQuarterLabel(): string {
   return `Q${q} ${now.getFullYear()}`;
 }
 
+const fmt = (v: number) =>
+  new Intl.NumberFormat("el-GR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(v);
+
 export function Overview() {
   const { data: activities } = useActivities();
   const { data: budgetLines } = useBudgetLines();
@@ -26,209 +40,269 @@ export function Overview() {
   const { data: documents } = useDocuments();
   const [imgError, setImgError] = useState(false);
 
-  const daysToOperation = daysUntil(PROJECT_CONSTANTS.operationDay1);
+  const daysToOp = daysUntil(PROJECT_CONSTANTS.operationDay1);
 
   const overallProgress = useMemo(() => {
     if (!activities?.length) return 0;
-    const total = activities.reduce((sum, a) => sum + a.progress_pct, 0);
-    return Math.round(total / activities.length);
+    return Math.round(
+      activities.reduce((s, a) => s + a.progress_pct, 0) / activities.length,
+    );
   }, [activities]);
 
-  const activeRiskCount = useMemo(() => {
-    if (!risks) return 0;
-    return risks.filter((r) => r.status !== "resolved").length;
-  }, [risks]);
+  const activeRiskCount = useMemo(
+    () => risks?.filter((r) => r.status !== "resolved").length ?? 0,
+    [risks],
+  );
 
-  const totalSpent = useMemo(() => {
-    if (!budgetLines) return 0;
-    return budgetLines.reduce((sum, l) => sum + l.actual_amount, 0);
-  }, [budgetLines]);
+  const totalSpent = useMemo(
+    () => budgetLines?.reduce((s, l) => s + l.actual_amount, 0) ?? 0,
+    [budgetLines],
+  );
 
-  const totalRevised = useMemo(() => {
-    if (!budgetLines) return 0;
-    return budgetLines.reduce((sum, l) => sum + l.anicon_revised, 0);
-  }, [budgetLines]);
+  const totalRevised = useMemo(
+    () => budgetLines?.reduce((s, l) => s + l.anicon_revised, 0) ?? 0,
+    [budgetLines],
+  );
 
-  const budgetPct = totalRevised > 0 ? Math.round((totalSpent / totalRevised) * 100) : 0;
+  const budgetPct =
+    totalRevised > 0 ? Math.round((totalSpent / totalRevised) * 100) : 0;
 
   const currentQActivities = useMemo(() => {
-    const qLabel = currentQuarterLabel();
-    if (!activities) return [];
-    return activities.filter((a) => a.quarter === qLabel);
+    const q = currentQuarterLabel();
+    return activities?.filter((a) => a.quarter === q) ?? [];
   }, [activities]);
 
-  const formatEuro = (v: number) =>
-    new Intl.NumberFormat("el-GR", {
-      style: "currency",
-      currency: "EUR",
-      maximumFractionDigits: 0,
-    }).format(v);
-
   return (
-    <div className="space-y-8">
-      {/* Hero Banner */}
-      <div className="relative rounded-2xl overflow-hidden -mx-8 -mt-8 mb-4">
+    <div className="-mx-8 -mt-8">
+      {/* ── Hero ── */}
+      <div className="relative h-72 overflow-hidden">
         <img
           src="/hotel-aerial.jpg"
-          alt="Olive Press Hotel — Aerial view, Molyvos, Lesvos"
-          className="w-full h-56 object-cover"
-          style={{ objectPosition: "center 35%" }}
+          alt="Olive Press Hotel — Aerial view"
+          className="w-full h-full object-cover"
+          style={{ objectPosition: "center 30%" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-        <div className="absolute bottom-0 left-0 p-8">
-          <h2 className="text-3xl font-bold text-white drop-shadow-lg">
-            {PROJECT_CONSTANTS.projectName}
-          </h2>
-          <p className="text-white/80 text-sm mt-1">
-            {PROJECT_CONSTANTS.location}
-          </p>
-          <p className="text-amber-300 text-sm mt-1 font-semibold">
-            {daysToOperation > 0
-              ? `${daysToOperation} days until operation`
-              : "Operational"}
-          </p>
-        </div>
-      </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-[#1a2e1a]/90 via-[#1a2e1a]/40 to-transparent" />
 
-      {/* Mediterranean divider */}
-      <div className="h-px bg-gradient-to-r from-transparent via-amber-600/30 to-transparent" />
+        {/* Hero content */}
+        <div className="absolute bottom-0 left-0 right-0 p-8 pb-6">
+          <div className="flex items-end justify-between max-w-full">
+            <div>
+              <h1 className="text-4xl font-bold text-white tracking-tight">
+                {PROJECT_CONSTANTS.projectName}
+              </h1>
+              <p className="text-emerald-200/80 text-sm mt-1 tracking-wide">
+                {PROJECT_CONSTANTS.location}
+              </p>
+            </div>
 
-      {/* Hotel Photo Strip */}
-      <div className="grid grid-cols-3 gap-3 -mt-2">
-        <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-pool.jpg" alt="Pool with Molyvos castle view" className="w-full h-full object-cover" style={{ objectPosition: "center 60%" }} />
-        </div>
-        <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-view.jpg" alt="Hotel from the sea" className="w-full h-full object-cover" style={{ objectPosition: "center 40%" }} />
-        </div>
-        <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-exterior.jpg" alt="Hotel stone exterior" className="w-full h-full object-cover" style={{ objectPosition: "center 30%" }} />
-        </div>
-      </div>
+            {/* Countdown */}
+            <div className="text-right hidden sm:block">
+              <p className="text-5xl font-bold text-white tabular-nums">
+                {daysToOp}
+              </p>
+              <p className="text-emerald-200/60 text-[11px] uppercase tracking-widest mt-1">
+                Days to Operation
+              </p>
+            </div>
+          </div>
 
-      {/* Heritage Identity */}
-      <div className="bg-white rounded-xl border border-stone-200 p-4 flex items-center gap-4">
-        <img src="/heritage-stork-emblem.jpg" alt="Olive Press Heritage — ΣΗΜΑ ΚΑΤΑΤΕΘΕΝ" className="w-20 h-20 rounded-full object-cover object-center border-2 border-amber-200" />
-        <div>
-          <p className="font-semibold text-stone-800">Heritage Emblem — ΣΗΜΑ ΚΑΤΑΤΕΘΕΝ</p>
-          <p className="text-xs text-stone-500 mt-1">19th century olive press trademark, preserved on the original stone masonry. Part of the building's cultural heritage designation.</p>
+          {/* Progress inline in hero */}
+          <div className="mt-5">
+            <div className="flex justify-between text-[11px] text-emerald-200/60 uppercase tracking-widest mb-1.5">
+              <span>Overall Progress</span>
+              <span className="text-white font-semibold text-xs normal-case">
+                {overallProgress}%
+              </span>
+            </div>
+            <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-400 rounded-full transition-all"
+                style={{ width: `${overallProgress}%` }}
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Overall Progress */}
-      <div>
-        <div className="flex justify-between text-sm text-stone-600 mb-1">
-          <span className="font-medium">Overall Progress</span>
-          <span className="font-semibold">{overallProgress}%</span>
-        </div>
-        <div className="w-full bg-stone-200 rounded-full h-3">
-          <div
-            className="bg-emerald-600 h-3 rounded-full transition-all"
-            style={{ width: `${overallProgress}%` }}
+        {/* Heritage emblem — floating badge in hero */}
+        <div className="absolute top-5 right-5 w-14 h-14 rounded-full overflow-hidden border-2 border-white/30 shadow-lg backdrop-blur-sm bg-white/10">
+          <img
+            src="/heritage-stork-emblem.jpg"
+            alt="ΣΗΜΑ ΚΑΤΑΤΕΘΕΝ"
+            className="w-full h-full object-cover"
+            title="Heritage Emblem — ΣΗΜΑ ΚΑΤΑΤΕΘΕΝ, 19th century olive press trademark"
           />
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <KpiCard
-          label="Construction Cost / m2"
-          value={formatEuro(PROJECT_CONSTANTS.constructionCostPerSqm)}
-          subtitle={`${PROJECT_CONSTANTS.totalSqm.toLocaleString()} m2 total`}
-        />
-        <KpiCard
-          label="Rooms Completed"
-          value={`0 / ${PROJECT_CONSTANTS.totalRooms}`}
-          subtitle="Pending construction"
-        />
-        <KpiCard
-          label="Active Risks"
-          value={String(activeRiskCount)}
-          variant={activeRiskCount > 5 ? "danger" : activeRiskCount > 2 ? "warning" : "default"}
-        />
-        <KpiCard
-          label="Documents"
-          value={String(documents?.length ?? 0)}
-        />
-        <KpiCard
-          label="State Subsidy"
-          value={formatEuro(PROJECT_CONSTANTS.stateSubsidy)}
-          subtitle={`\u0391\u03BD\u03B1\u03C0\u03C4\u03C5\u03BE\u03B9\u03B1\u03BA\u03CC\u03C2 \u039D\u03CC\u03BC\u03BF\u03C2, ${PROJECT_CONSTANTS.subsidyRate * 100}% of ${formatEuro(PROJECT_CONSTANTS.approvedSubsidyBudget)}`}
-        />
-      </div>
-
-      {/* Budget Gauge */}
-      <div className="bg-amber-50/40 rounded-xl border border-stone-200 p-5">
-        <h3 className="text-sm font-medium text-stone-500 mb-3">
-          Budget Utilisation
-        </h3>
-        <div className="flex items-end gap-4 mb-2">
-          <span className="text-2xl font-bold text-stone-900">
-            {formatEuro(totalSpent)}
-          </span>
-          <span className="text-sm text-stone-400 pb-0.5">
-            of {formatEuro(totalRevised)} revised
-          </span>
-        </div>
-        <div className="w-full bg-stone-200 rounded-full h-4">
-          <div
-            className={`h-4 rounded-full transition-all ${
-              budgetPct > 100 ? "bg-red-500" : budgetPct > 80 ? "bg-amber-500" : "bg-emerald-500"
-            }`}
-            style={{ width: `${Math.min(budgetPct, 100)}%` }}
-          />
-        </div>
-        <p className="text-xs text-stone-400 mt-1">{budgetPct}% utilised</p>
-      </div>
-
-      {/* Current Quarter Activities */}
-      <div className="bg-white rounded-xl border border-stone-200 p-5">
-        <h3 className="text-sm font-medium text-stone-500 mb-4">
-          {currentQuarterLabel()} Activities
-        </h3>
-        {currentQActivities.length === 0 ? (
-          <p className="text-stone-400 text-sm">
-            No activities scheduled for this quarter.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {currentQActivities.map((a) => (
-              <div key={a.id} className="flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-stone-700" title={`${a.number}. ${a.name}`}>
-                    {a.number}. {a.name}
-                  </p>
-                  <div className="w-full bg-stone-100 rounded-full h-2 mt-1">
-                    <div
-                      className="bg-emerald-500 h-2 rounded-full"
-                      style={{ width: `${a.progress_pct}%` }}
-                    />
-                  </div>
-                </div>
-                <span className="text-xs text-stone-400 w-10 text-right shrink-0">
-                  {a.progress_pct}%
+      {/* ── KPI Strip ── */}
+      <div className="px-8 -mt-6 relative z-10">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          {[
+            {
+              icon: Building2,
+              label: "Rooms",
+              value: `0 / ${PROJECT_CONSTANTS.totalRooms}`,
+              sub: "Pending construction",
+              color: "text-stone-600",
+            },
+            {
+              icon: TrendingUp,
+              label: "Cost / m\u00B2",
+              value: `\u20AC${PROJECT_CONSTANTS.constructionCostPerSqm.toLocaleString()}`,
+              sub: `${PROJECT_CONSTANTS.totalSqm.toLocaleString()} m\u00B2 total`,
+              color: "text-stone-600",
+            },
+            {
+              icon: ShieldAlert,
+              label: "Active Risks",
+              value: String(activeRiskCount),
+              sub: `${risks?.filter((r) => r.status === "resolved").length ?? 0} resolved`,
+              color:
+                activeRiskCount > 10
+                  ? "text-red-600"
+                  : activeRiskCount > 5
+                    ? "text-amber-600"
+                    : "text-emerald-600",
+            },
+            {
+              icon: FileText,
+              label: "Documents",
+              value: String(documents?.length ?? 0),
+              sub: "Upload in Documents tab",
+              color: "text-stone-600",
+            },
+            {
+              icon: Banknote,
+              label: "State Subsidy",
+              value: fmt(PROJECT_CONSTANTS.stateSubsidy),
+              sub: `\u0391\u03BD\u03B1\u03C0\u03C4\u03C5\u03BE\u03B9\u03B1\u03BA\u03CC\u03C2 50%`,
+              color: "text-emerald-600",
+            },
+          ].map((kpi) => (
+            <div
+              key={kpi.label}
+              className="bg-white rounded-xl border border-stone-200/80 p-4 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <kpi.icon className="w-3.5 h-3.5 text-stone-400" />
+                <span className="text-[10px] uppercase tracking-widest text-stone-400 font-medium">
+                  {kpi.label}
                 </span>
-                <StatusBadge value={a.status} />
               </div>
-            ))}
+              <p className={`text-xl font-bold tabular-nums ${kpi.color}`}>
+                {kpi.value}
+              </p>
+              {kpi.sub && (
+                <p className="text-[11px] text-stone-400 mt-0.5">{kpi.sub}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Main content ── */}
+      <div className="px-8 mt-8 space-y-6 pb-8">
+        {/* Budget & Activities side by side on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Budget Gauge */}
+          <div className="bg-white rounded-xl border border-stone-200/80 p-6 shadow-sm">
+            <h3 className="text-[10px] uppercase tracking-widest text-stone-400 font-medium mb-4">
+              Budget Utilisation
+            </h3>
+            <div className="flex items-baseline gap-3 mb-3">
+              <span className="text-3xl font-bold text-stone-800 tabular-nums">
+                {fmt(totalSpent)}
+              </span>
+              <span className="text-sm text-stone-400">
+                of {fmt(totalRevised)}
+              </span>
+            </div>
+            <div className="h-2.5 bg-stone-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  budgetPct > 100
+                    ? "bg-red-500"
+                    : budgetPct > 80
+                      ? "bg-amber-500"
+                      : "bg-emerald-500"
+                }`}
+                style={{ width: `${Math.min(budgetPct, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-2">
+              <p className="text-[11px] text-stone-400">
+                {budgetPct}% utilised
+              </p>
+              <p className="text-[11px] text-stone-400">
+                {fmt(totalRevised - totalSpent)} remaining
+              </p>
+            </div>
+          </div>
+
+          {/* Current Quarter Activities */}
+          <div className="bg-white rounded-xl border border-stone-200/80 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[10px] uppercase tracking-widest text-stone-400 font-medium">
+                {currentQuarterLabel()} Activities
+              </h3>
+              <CalendarClock className="w-3.5 h-3.5 text-stone-300" />
+            </div>
+            {currentQActivities.length === 0 ? (
+              <p className="text-stone-400 text-sm py-4">
+                No activities scheduled for this quarter.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {currentQActivities.map((a) => (
+                  <div key={a.id} className="group">
+                    <div className="flex items-center justify-between mb-1">
+                      <p
+                        className="text-sm text-stone-700 truncate pr-4"
+                        title={`${a.number}. ${a.name}`}
+                      >
+                        <span className="text-stone-400 tabular-nums mr-1.5">
+                          {a.number}.
+                        </span>
+                        {a.name}
+                      </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] text-stone-400 tabular-nums">
+                          {a.progress_pct}%
+                        </span>
+                        <StatusBadge value={a.status} />
+                      </div>
+                    </div>
+                    <div className="h-1 bg-stone-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500/70 rounded-full transition-all"
+                        style={{ width: `${a.progress_pct}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Masterplan */}
+        {!imgError && (
+          <div className="bg-white rounded-xl border border-stone-200/80 p-6 shadow-sm">
+            <h3 className="text-[10px] uppercase tracking-widest text-stone-400 font-medium mb-4">
+              Site Masterplan
+            </h3>
+            <div className="rounded-lg overflow-hidden bg-stone-900">
+              <img
+                src="/masterplan.png"
+                alt="Olive Press Hotel Masterplan"
+                className="w-full"
+                onError={() => setImgError(true)}
+              />
+            </div>
           </div>
         )}
       </div>
-
-      {/* Masterplan */}
-      {!imgError && (
-        <div className="bg-white rounded-xl border border-stone-200 p-5">
-          <h3 className="text-sm font-medium text-stone-500 mb-3">
-            Site Masterplan
-          </h3>
-          <img
-            src="/masterplan.png"
-            alt="Olive Press Hotel Masterplan"
-            className="w-full rounded-lg"
-            onError={() => setImgError(true)}
-          />
-        </div>
-      )}
     </div>
   );
 }
