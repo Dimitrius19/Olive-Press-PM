@@ -17,7 +17,8 @@ export function PasswordGate({ onAuthenticated, error }: PasswordGateProps) {
       <img
         src="/hotel-aerial.jpg"
         alt=""
-        className="absolute inset-0 w-full h-full object-cover object-center opacity-40"
+        className="absolute inset-0 w-full h-full object-cover opacity-40"
+        style={{ objectPosition: "center 35%" }}
       />
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/60" />
       <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 w-full max-w-sm relative z-10 border border-white/30">

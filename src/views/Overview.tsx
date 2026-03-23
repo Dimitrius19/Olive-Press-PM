@@ -71,7 +71,8 @@ export function Overview() {
         <img
           src="/hotel-aerial.jpg"
           alt="Olive Press Hotel — Aerial view, Molyvos, Lesvos"
-          className="w-full h-56 object-cover object-center"
+          className="w-full h-56 object-cover"
+          style={{ objectPosition: "center 35%" }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         <div className="absolute bottom-0 left-0 p-8">
@@ -95,13 +96,13 @@ export function Overview() {
       {/* Hotel Photo Strip */}
       <div className="grid grid-cols-3 gap-3 -mt-2">
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-pool.jpg" alt="Pool with Molyvos castle view" className="w-full h-full object-cover object-center" />
+          <img src="/hotel-pool.jpg" alt="Pool with Molyvos castle view" className="w-full h-full object-cover" style={{ objectPosition: "center 60%" }} />
         </div>
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-view.jpg" alt="Hotel from the sea" className="w-full h-full object-cover object-center" />
+          <img src="/hotel-view.jpg" alt="Hotel from the sea" className="w-full h-full object-cover" style={{ objectPosition: "center 40%" }} />
         </div>
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-exterior.jpg" alt="Hotel stone exterior" className="w-full h-full object-cover object-center" />
+          <img src="/hotel-exterior.jpg" alt="Hotel stone exterior" className="w-full h-full object-cover" style={{ objectPosition: "center 30%" }} />
         </div>
       </div>
 
