@@ -386,7 +386,11 @@ export function benchmarkBudgetLine(
   const { verdict, verdictColor, verdictLabel } = getVerdict(positionInRange);
 
   // Savings opportunity: if above mid, how much could be saved
-  const midCost = benchmark.midRange * quantity;
+  // For percentage-based benchmarks, midCost = (midRange/100) × constructionTotal
+  const isPercentBased = benchmark.unit === "% of construction";
+  const midCost = isPercentBased
+    ? (benchmark.midRange / 100) * quantity
+    : benchmark.midRange * quantity;
   const savingsOpportunity =
     impliedRate > benchmark.midRange ? amount - midCost : 0;
 
