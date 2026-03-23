@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Users,
   Image,
+  Map,
   TrendingUp,
   Calculator,
   type LucideIcon,
@@ -19,6 +20,7 @@ export type ViewName =
   | "risks"
   | "team"
   | "gallery"
+  | "siteplan"
   | "market"
   | "financial";
 
@@ -36,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "risks", label: "Risks", icon: AlertTriangle },
   { key: "team", label: "Team", icon: Users },
   { key: "gallery", label: "Gallery", icon: Image },
+  { key: "siteplan", label: "Site Plan", icon: Map },
   { key: "market", label: "Market Check", icon: TrendingUp },
   { key: "financial", label: "Financial Model", icon: Calculator },
 ];

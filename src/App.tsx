@@ -12,6 +12,7 @@ import { Team } from "./views/Team";
 import { Gallery } from "./views/Gallery";
 import { MarketCheck } from "./views/MarketCheck";
 import { FinancialModel } from "./views/FinancialModel";
+import { SitePlan } from "./views/SitePlan";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ const viewComponents: Record<ViewName, ComponentType> = {
   risks: Risks,
   team: Team,
   gallery: Gallery,
+  siteplan: SitePlan,
   market: MarketCheck,
   financial: FinancialModel,
 };
