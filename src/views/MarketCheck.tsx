@@ -17,6 +17,7 @@ import {
   XCircle,
   Info,
   ShieldCheck,
+  Ruler,
 } from "lucide-react";
 import { useMarketData, type MarketDataPoint } from "../hooks/useMarketData";
 import { useBudgetLines } from "../hooks/useBudget";
@@ -26,6 +27,13 @@ import {
   quartersForMidpoint,
   type IndexType,
 } from "../lib/budget-validator";
+import {
+  benchmarkAllLines,
+  summarizeBenchmarks,
+  PROJECT_AREAS,
+  type BenchmarkResult,
+  type BenchmarkSummary,
+} from "../lib/unit-rate-benchmarks";
 
 // ---------- ANICON Budget Constants ----------
 
@@ -172,6 +180,62 @@ function RangeBar({
           style={{ left: `${pos}%`, transform: "translateX(-50%)" }}
         >
           {label}: {formatFn(value)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BenchmarkRangeBar({
+  low,
+  mid,
+  high,
+  value,
+  unit,
+}: {
+  low: number;
+  mid: number;
+  high: number;
+  value: number;
+  unit: string;
+}) {
+  const range = high - low;
+  const midPos = range > 0 ? ((mid - low) / range) * 100 : 50;
+  const valuePos = range > 0 ? Math.max(0, Math.min(110, ((value - low) / range) * 100)) : 50;
+  const isPercent = unit === "% of construction";
+  const formatVal = (n: number) =>
+    isPercent
+      ? `${n.toFixed(1)}%`
+      : unit === "€/lump"
+        ? fmtEur(n)
+        : fmtEur(n);
+
+  return (
+    <div className="mt-2">
+      <div className="flex justify-between text-[10px] text-stone-400 mb-1">
+        <span>Low: {formatVal(low)}</span>
+        <span>Mid: {formatVal(mid)}</span>
+        <span>High: {formatVal(high)}</span>
+      </div>
+      <div className="relative h-4 rounded-full bg-gradient-to-r from-emerald-100 via-amber-100 to-red-100">
+        {/* Mid marker */}
+        <div
+          className="absolute top-0 h-4 w-px bg-stone-400"
+          style={{ left: `${midPos}%` }}
+        />
+        {/* Value marker */}
+        <div
+          className="absolute top-0 h-4 w-1.5 bg-stone-800 rounded-full"
+          style={{ left: `${Math.min(valuePos, 100)}%` }}
+        />
+        <div
+          className="absolute -top-5 text-[10px] font-bold text-stone-800 whitespace-nowrap"
+          style={{
+            left: `${Math.min(valuePos, 100)}%`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          ANICON: {formatVal(value)}
         </div>
       </div>
     </div>
@@ -396,6 +460,17 @@ export function MarketCheck() {
       { rate: 0.06, label: "6% annual", isAnicon: false, ...scenarioImpact(budgetLines, 0.06, qtrs) },
     ];
   }, [budgetLines, midpoint]);
+
+  // Unit rate benchmarking
+  const benchmarkResults = useMemo<BenchmarkResult[]>(() => {
+    if (!budgetLines) return [];
+    return benchmarkAllLines(budgetLines, PROJECT_AREAS);
+  }, [budgetLines]);
+
+  const benchmarkSummary = useMemo<BenchmarkSummary | null>(() => {
+    if (benchmarkResults.length === 0 || !budgetLines) return null;
+    return summarizeBenchmarks(benchmarkResults, budgetLines.length);
+  }, [benchmarkResults, budgetLines]);
 
   // ---------- Render ----------
 
@@ -905,6 +980,285 @@ export function MarketCheck() {
               ))}
             </div>
           )}
+        </>
+      )}
+
+      {/* ===== Unit Rate Benchmarking ===== */}
+      {benchmarkResults.length > 0 && benchmarkSummary && (
+        <>
+          {/* Section Header */}
+          <div className="pt-4 border-t border-stone-200">
+            <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
+              <Ruler size={24} className="text-emerald-600" />
+              Unit Rate Benchmarking
+            </h2>
+            <p className="text-sm text-stone-500 mt-1">
+              Comparing ANICON estimates against Greek construction market rates
+              (PEDMEDE/ATEE 2025)
+            </p>
+          </div>
+
+          {/* Overall Assessment */}
+          <div
+            className={`rounded-xl border p-5 ${
+              benchmarkSummary.netPosition === "accurate"
+                ? "border-emerald-200 bg-emerald-50/60"
+                : benchmarkSummary.netPosition === "aggressive"
+                  ? "border-red-200 bg-red-50/60"
+                  : "border-amber-200 bg-amber-50/60"
+            }`}
+          >
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                  Lines Matched
+                </p>
+                <p className="text-xl font-bold text-stone-800 mt-1">
+                  {benchmarkSummary.matchedCount} of{" "}
+                  {benchmarkSummary.totalLines}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                  Within Market Range
+                </p>
+                <p className="text-xl font-bold text-emerald-700 mt-1">
+                  {benchmarkSummary.withinRangeCount} of{" "}
+                  {benchmarkSummary.matchedCount}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                  Potential Overbudgeting
+                </p>
+                <p className="text-xl font-bold text-amber-700 mt-1">
+                  {benchmarkSummary.totalOverbudgeted > 0
+                    ? `€${fmtK(benchmarkSummary.totalOverbudgeted)}`
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">
+                  Potential Underbudgeting
+                </p>
+                <p className="text-xl font-bold text-red-700 mt-1">
+                  {benchmarkSummary.totalUnderbudgeted > 0
+                    ? `€${fmtK(benchmarkSummary.totalUnderbudgeted)}`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t border-stone-200 flex items-center gap-3">
+              {benchmarkSummary.netPosition === "accurate" && (
+                <CheckCircle size={20} className="text-emerald-600" />
+              )}
+              {benchmarkSummary.netPosition === "aggressive" && (
+                <AlertTriangle size={20} className="text-red-600" />
+              )}
+              {benchmarkSummary.netPosition === "conservative" && (
+                <Info size={20} className="text-amber-600" />
+              )}
+              <p className="text-sm text-stone-700">
+                Budget appears{" "}
+                <span
+                  className={`font-bold ${
+                    benchmarkSummary.netPosition === "accurate"
+                      ? "text-emerald-700"
+                      : benchmarkSummary.netPosition === "aggressive"
+                        ? "text-red-700"
+                        : "text-amber-700"
+                  }`}
+                >
+                  {benchmarkSummary.netPosition}
+                </span>{" "}
+                vs. market rates (weighted position:{" "}
+                {Math.round(benchmarkSummary.weightedPosition)}% of range)
+              </p>
+            </div>
+          </div>
+
+          {/* Benchmark Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {benchmarkResults.map((r) => {
+              const verdictClasses = r.verdictColor.split(" ");
+              const textClass = verdictClasses[0] || "";
+              const bgClass = verdictClasses.slice(1).join(" ");
+              return (
+                <Card key={r.benchmark.id + r.line.id}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h4 className="font-semibold text-stone-800 text-sm">
+                        {r.line.description}
+                      </h4>
+                      <p className="text-xs text-stone-400 mt-0.5">
+                        {r.benchmark.description}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${bgClass} ${textClass}`}
+                    >
+                      {r.verdictLabel}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                    <div>
+                      <p className="text-xs text-stone-400">ANICON Total</p>
+                      <p className="font-bold text-stone-800">
+                        {fmtEur(r.line.anicon_revised)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-stone-400">
+                        Implied Unit Rate
+                      </p>
+                      <p className="font-bold text-stone-800">
+                        {r.benchmark.unit === "% of construction"
+                          ? `${r.impliedRate.toFixed(1)}%`
+                          : r.benchmark.unit === "€/lump"
+                            ? fmtEur(r.impliedRate)
+                            : `${fmtEur(r.impliedRate)}/${r.benchmark.unit.replace("€/", "")}`}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-[10px] text-stone-400 mb-1">
+                    Quantity: {r.quantityLabel}
+                  </p>
+
+                  {/* Range Bar */}
+                  <BenchmarkRangeBar
+                    low={r.benchmark.lowRange}
+                    mid={r.benchmark.midRange}
+                    high={r.benchmark.highRange}
+                    value={r.impliedRate}
+                    unit={r.benchmark.unit}
+                  />
+
+                  {/* Savings/Risk callout */}
+                  {r.savingsOpportunity > 0 && (
+                    <p className="text-xs text-amber-700 mt-2 flex items-center gap-1">
+                      <Info size={11} className="shrink-0" />
+                      Potential savings: {fmtEur(r.savingsOpportunity)} if
+                      negotiated to market mid
+                    </p>
+                  )}
+                  {r.riskExposure > 0 && (
+                    <p className="text-xs text-red-700 mt-2 flex items-center gap-1">
+                      <AlertTriangle size={11} className="shrink-0" />
+                      Risk: {fmtEur(r.riskExposure)} underbudgeted vs. market
+                      mid
+                    </p>
+                  )}
+
+                  <p className="text-[10px] text-stone-400 mt-2">
+                    Source: {r.benchmark.source}
+                  </p>
+                  <p className="text-[10px] text-stone-400">
+                    {r.benchmark.notes}
+                  </p>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Summary Table */}
+          <Card>
+            <CardTitle>Benchmark Summary</CardTitle>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-stone-200 text-left">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                      Line
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      ANICON
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      Unit Rate
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      Market Mid
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      Position
+                    </th>
+                    <th className="py-2 text-xs font-semibold text-stone-500 uppercase tracking-wider text-center">
+                      Verdict
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {benchmarkResults.map((r) => {
+                    const verdictClasses = r.verdictColor.split(" ");
+                    const textClass = verdictClasses[0] || "";
+                    return (
+                      <tr
+                        key={r.benchmark.id + r.line.id}
+                        className="border-b border-stone-100"
+                      >
+                        <td className="py-2 pr-3">
+                          <div className="font-medium text-stone-700 truncate max-w-[200px]">
+                            {r.line.description}
+                          </div>
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                          {fmtEur(r.line.anicon_revised)}
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                          {r.benchmark.unit === "% of construction"
+                            ? `${r.impliedRate.toFixed(1)}%`
+                            : fmtEur(r.impliedRate)}
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                          {r.benchmark.unit === "% of construction"
+                            ? `${r.benchmark.midRange}%`
+                            : fmtEur(r.benchmark.midRange)}
+                        </td>
+                        <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                          {Math.round(r.positionInRange)}%
+                        </td>
+                        <td className="py-2 text-center">
+                          <span
+                            className={`text-[10px] font-semibold ${textClass}`}
+                          >
+                            {r.verdictLabel}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Totals row */}
+                  <tr className="border-t-2 border-stone-300 font-bold">
+                    <td className="py-2 pr-3 text-stone-800">Total Benchmarked</td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-stone-800">
+                      {fmtEur(benchmarkSummary.totalBenchmarked)}
+                    </td>
+                    <td className="py-2 pr-3 text-right text-stone-500" colSpan={2}>
+                      Weighted avg position
+                    </td>
+                    <td className="py-2 pr-3 text-right tabular-nums text-stone-800">
+                      {Math.round(benchmarkSummary.weightedPosition)}%
+                    </td>
+                    <td className="py-2 text-center">
+                      <span
+                        className={`text-[10px] font-semibold ${
+                          benchmarkSummary.netPosition === "accurate"
+                            ? "text-emerald-700"
+                            : benchmarkSummary.netPosition === "aggressive"
+                              ? "text-red-700"
+                              : "text-amber-700"
+                        }`}
+                      >
+                        {benchmarkSummary.netPosition.toUpperCase()}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </>
       )}
 
