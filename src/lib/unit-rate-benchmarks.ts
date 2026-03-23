@@ -3,9 +3,10 @@ import type { BudgetLine } from "./types";
 // ---------- Project Physical Data (from ANICON report) ----------
 
 export const PROJECT_AREAS = {
-  totalBuildingArea: 6658, // m² preserved building + courtyard
-  groundFloorArea: 3200, // est. m²
-  upperFloorArea: 2400, // est. m²
+  totalBuildingArea: 4500, // m² actual built/renovated area (excl. courtyard/outdoor)
+  totalSiteArea: 6658, // m² preserved building + courtyard (ANICON report figure)
+  groundFloorArea: 2600, // est. m² built
+  upperFloorArea: 1900, // est. m² built
   basementArea: 587, // m² (Olive Press II underground)
   surroundingArea: 6658, // m² outdoor/landscaping
   neighboringPlot: 6754, // m² (Olive Press II plot)
@@ -184,14 +185,14 @@ export const BENCHMARKS: UnitRateBenchmark[] = [
   {
     id: "pre_opening",
     category: "E",
-    description: "Signage, branding & pre-opening costs",
+    description: "Signage, branding & pre-opening (incl. staff, marketing, launch)",
     unit: "€/room",
-    lowRange: 3000,
-    midRange: 8000,
-    highRange: 20000,
-    source: "Hotel pre-opening budget benchmarks",
+    lowRange: 8000,
+    midRange: 18000,
+    highRange: 35000,
+    source: "Hotel pre-opening budgets Greece/Med 2025, incl. staff training & marketing",
     notes:
-      "Staff recruitment & training, marketing, soft opening, consumables, IT setup.",
+      "Full pre-opening: signage, branding, website, OTAs, staff recruitment & 3-month training, soft opening, marketing launch, IT/PMS setup. Heritage boutique hotels spend more on positioning.",
   },
 ];
 
