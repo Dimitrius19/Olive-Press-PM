@@ -9,6 +9,8 @@ import {
   Trees,
   Waves,
   Wrench,
+  Move,
+  Crosshair,
 } from "lucide-react";
 
 /* ------------------------------------------------------------------ */
@@ -204,6 +206,14 @@ export function SitePlan() {
   const [activeAnnotation, setActiveAnnotation] = useState<string | null>(null);
   const [hdLoaded, setHdLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [calibrationMode, setCalibrationMode] = useState(false);
+  const [annotationPositions, setAnnotationPositions] = useState<
+    Record<string, { x: number; y: number }>
+  >(Object.fromEntries(ANNOTATIONS.map((a) => [a.id, { x: a.x, y: a.y }])));
+  const [draggingAnnotation, setDraggingAnnotation] = useState<string | null>(
+    null,
+  );
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Preload HD image when zoom crosses 2x
   useEffect(() => {
@@ -239,10 +249,12 @@ export function SitePlan() {
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (e.button !== 0) return;
+      // Don't start panning if we're dragging an annotation
+      if (draggingAnnotation) return;
       setIsDragging(true);
       setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
     },
-    [position],
+    [position, draggingAnnotation],
   );
 
   const handleMouseMove = useCallback(
@@ -312,6 +324,73 @@ export function SitePlan() {
     lastTouchDistance.current = null;
   }, []);
 
+  /* --- Calibration drag handlers --- */
+  const handleAnnotationDragStart = useCallback(
+    (e: React.MouseEvent, id: string) => {
+      if (!calibrationMode) return;
+      e.stopPropagation();
+      e.preventDefault();
+      setDraggingAnnotation(id);
+
+      const imgEl = imgRef.current;
+      if (!imgEl) return;
+
+      const handleDragMove = (moveEvent: MouseEvent) => {
+        if (!imgEl) return;
+
+        // Use the image's bounding rect to compute percentages correctly,
+        // accounting for current zoom and pan transforms.
+        const imgRect = imgEl.getBoundingClientRect();
+
+        const xPct =
+          ((moveEvent.clientX - imgRect.left) / imgRect.width) * 100;
+        const yPct =
+          ((moveEvent.clientY - imgRect.top) / imgRect.height) * 100;
+
+        setAnnotationPositions((prev) => ({
+          ...prev,
+          [id]: {
+            x: Math.max(0, Math.min(100, Math.round(xPct * 10) / 10)),
+            y: Math.max(0, Math.min(100, Math.round(yPct * 10) / 10)),
+          },
+        }));
+      };
+
+      const handleDragEnd = () => {
+        setDraggingAnnotation(null);
+        document.removeEventListener("mousemove", handleDragMove);
+        document.removeEventListener("mouseup", handleDragEnd);
+      };
+
+      document.addEventListener("mousemove", handleDragMove);
+      document.addEventListener("mouseup", handleDragEnd);
+    },
+    [calibrationMode],
+  );
+
+  const savePositions = useCallback(() => {
+    const output = Object.fromEntries(
+      Object.entries(annotationPositions).map(([id, pos]) => [
+        id,
+        { x: pos.x, y: pos.y },
+      ]),
+    );
+    const json = JSON.stringify(output, null, 2);
+    console.log("Annotation Positions:", json);
+    navigator.clipboard.writeText(json).then(() => {
+      setToastMessage("Positions copied to clipboard");
+      setTimeout(() => setToastMessage(null), 3000);
+    });
+  }, [annotationPositions]);
+
+  const resetPositions = useCallback(() => {
+    setAnnotationPositions(
+      Object.fromEntries(
+        ANNOTATIONS.map((a) => [a.id, { x: a.x, y: a.y }]),
+      ),
+    );
+  }, []);
+
   /* --- Zoom to annotation --- */
   const zoomToAnnotation = useCallback(
     (annotation: MapAnnotation) => {
@@ -323,28 +402,31 @@ export function SitePlan() {
       const imgWidth = imgRef.current?.naturalWidth ?? rect.width;
       const imgHeight = imgRef.current?.naturalHeight ?? rect.height;
 
+      // Use calibration positions if available
+      const pos = annotationPositions[annotation.id] ?? {
+        x: annotation.x,
+        y: annotation.y,
+      };
+
       // Compute displayed image size at target scale
       const displayedWidth = imgWidth * targetScale;
       const displayedHeight = imgHeight * targetScale;
 
       // Annotation position in displayed coordinates (from center of image)
-      const annX = (annotation.x / 100) * displayedWidth;
-      const annY = (annotation.y / 100) * displayedHeight;
+      const annX = (pos.x / 100) * displayedWidth;
+      const annY = (pos.y / 100) * displayedHeight;
 
       // We want the annotation to be in the center of the viewport
-      // The image transform origin is center, so translate(0,0) means image center is at container center
-      // At translate(0,0), the top-left of the image is at (containerCenter - displayedWidth/2, containerCenter - displayedHeight/2)
-      // The annotation is at (topLeft + annX, topLeft + annY) in viewport coords
-      // We want that to equal (rect.width/2, rect.height/2)
-
-      const offsetX = rect.width / 2 - (annX - displayedWidth / 2 + rect.width / 2);
-      const offsetY = rect.height / 2 - (annY - displayedHeight / 2 + rect.height / 2);
+      const offsetX =
+        rect.width / 2 - (annX - displayedWidth / 2 + rect.width / 2);
+      const offsetY =
+        rect.height / 2 - (annY - displayedHeight / 2 + rect.height / 2);
 
       setScale(targetScale);
       setPosition({ x: offsetX, y: offsetY });
       setActiveAnnotation(annotation.id);
     },
-    [],
+    [annotationPositions],
   );
 
   /* --- Zoom controls --- */
@@ -415,6 +497,18 @@ export function SitePlan() {
             <RotateCcw size={18} />
           </button>
           <button
+            onClick={() => setCalibrationMode((m) => !m)}
+            className={`ml-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              calibrationMode
+                ? "bg-amber-100 text-amber-700"
+                : "bg-stone-100 text-stone-600"
+            }`}
+            title="Toggle calibration mode"
+          >
+            <Crosshair size={14} />
+            {calibrationMode ? "Exit Calibration" : "Calibrate Positions"}
+          </button>
+          <button
             onClick={() => setSidebarOpen((o) => !o)}
             className={`ml-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
               sidebarOpen
@@ -426,6 +520,32 @@ export function SitePlan() {
           </button>
         </div>
       </div>
+
+      {/* Calibration mode banner */}
+      {calibrationMode && (
+        <div className="bg-amber-100 border-b border-amber-200 px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Move className="w-4 h-4 text-amber-700" />
+            <span className="text-sm font-medium text-amber-800">
+              Calibration Mode — drag annotations to correct positions
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={savePositions}
+              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-lg transition-colors"
+            >
+              Save Positions
+            </button>
+            <button
+              onClick={resetPositions}
+              className="px-3 py-1 bg-stone-200 hover:bg-stone-300 text-stone-700 text-xs rounded-lg transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
@@ -469,33 +589,61 @@ export function SitePlan() {
               {ANNOTATIONS.map((ann) => {
                 const cfg = CATEGORY_CONFIG[ann.category];
                 const isActive = activeAnnotation === ann.id;
+                const pos = annotationPositions[ann.id] ?? {
+                  x: ann.x,
+                  y: ann.y,
+                };
+                const isBeingDragged = draggingAnnotation === ann.id;
                 return (
                   <button
                     key={ann.id}
-                    className="absolute group"
+                    className={`absolute group ${calibrationMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                     style={{
-                      left: `${ann.x}%`,
-                      top: `${ann.y}%`,
+                      left: `${pos.x}%`,
+                      top: `${pos.y}%`,
                       transform: `translate(-50%, -50%) scale(${1 / scale})`,
-                      zIndex: isActive ? 50 : 10,
+                      zIndex: isActive || isBeingDragged ? 50 : 10,
                     }}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setActiveAnnotation(isActive ? null : ann.id);
+                      if (!calibrationMode) {
+                        setActiveAnnotation(isActive ? null : ann.id);
+                      }
                     }}
+                    onMouseDown={(e) => handleAnnotationDragStart(e, ann.id)}
                   >
-                    {/* Pulse ring */}
-                    <span
-                      className={`absolute inset-0 rounded-full ${cfg.pulse} animate-ping`}
-                      style={{ width: 20, height: 20, margin: "auto" }}
-                    />
+                    {/* Pulse ring — hidden in calibration mode */}
+                    {!calibrationMode && (
+                      <span
+                        className={`absolute inset-0 rounded-full ${cfg.pulse} animate-ping`}
+                        style={{ width: 20, height: 20, margin: "auto" }}
+                      />
+                    )}
                     {/* Dot */}
                     <span
-                      className={`relative block w-5 h-5 rounded-full ${cfg.bg} border-2 border-white shadow-lg shadow-black/30`}
+                      className={`relative block rounded-full ${cfg.bg} shadow-lg shadow-black/30 ${
+                        calibrationMode
+                          ? "w-6 h-6 border-2 border-dashed border-white ring-2 ring-amber-400/60"
+                          : "w-5 h-5 border-2 border-white"
+                      } ${isBeingDragged ? "ring-4 ring-amber-300" : ""}`}
                     />
 
-                    {/* Popup card */}
-                    {isActive && (
+                    {/* Coordinate tooltip in calibration mode */}
+                    {calibrationMode && (
+                      <div
+                        className="absolute whitespace-nowrap bg-black/80 text-white text-[10px] font-mono px-2 py-0.5 rounded pointer-events-none"
+                        style={{
+                          top: "calc(100% + 4px)",
+                          left: "50%",
+                          transform: "translateX(-50%)",
+                        }}
+                      >
+                        {pos.x.toFixed(1)}%, {pos.y.toFixed(1)}%
+                      </div>
+                    )}
+
+                    {/* Popup card — only in normal mode */}
+                    {isActive && !calibrationMode && (
                       <div
                         className="absolute z-50 w-72 bg-stone-800/95 backdrop-blur-sm border border-stone-600/50 rounded-xl shadow-2xl text-left"
                         style={{
@@ -536,7 +684,9 @@ export function SitePlan() {
                                 key={i}
                                 className="text-xs text-stone-300 flex items-start gap-2"
                               >
-                                <span className={`mt-1.5 w-1 h-1 rounded-full ${cfg.bg} shrink-0`} />
+                                <span
+                                  className={`mt-1.5 w-1 h-1 rounded-full ${cfg.bg} shrink-0`}
+                                />
                                 {d}
                               </li>
                             ))}
@@ -545,7 +695,9 @@ export function SitePlan() {
                         {/* Arrow */}
                         <div
                           className="absolute left-1/2 -bottom-2 w-4 h-4 bg-stone-800/95 border-r border-b border-stone-600/50 rotate-45"
-                          style={{ transform: "translateX(-50%) rotate(45deg)" }}
+                          style={{
+                            transform: "translateX(-50%) rotate(45deg)",
+                          }}
                         />
                       </div>
                     )}
@@ -554,6 +706,13 @@ export function SitePlan() {
               })}
             </div>
           </div>
+
+          {/* Toast notification */}
+          {toastMessage && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-lg">
+              {toastMessage}
+            </div>
+          )}
 
           {/* Zoom indicator overlay */}
           {scale !== 1 && (
