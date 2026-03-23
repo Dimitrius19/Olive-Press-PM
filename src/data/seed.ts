@@ -18,4 +18,7 @@ export const PROJECT_CONSTANTS = {
   contingencyRate: 0.10,
   inflationRate: 0.04,
   vatRate: 0.24,
+  stateSubsidy: 3_000_000, // Αναπτυξιακός Νόμος - 50% of €6M approved
+  approvedSubsidyBudget: 6_000_000,
+  subsidyRate: 0.50,
 } as const;

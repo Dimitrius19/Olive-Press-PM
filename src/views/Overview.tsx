@@ -120,7 +120,7 @@ export function Overview() {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard
           label="Construction Cost / m2"
           value={formatEuro(PROJECT_CONSTANTS.constructionCostPerSqm)}
@@ -139,6 +139,11 @@ export function Overview() {
         <KpiCard
           label="Documents"
           value={String(documents?.length ?? 0)}
+        />
+        <KpiCard
+          label="State Subsidy"
+          value={formatEuro(PROJECT_CONSTANTS.stateSubsidy)}
+          subtitle={`\u0391\u03BD\u03B1\u03C0\u03C4\u03C5\u03BE\u03B9\u03B1\u03BA\u03CC\u03C2 \u039D\u03CC\u03BC\u03BF\u03C2, ${PROJECT_CONSTANTS.subsidyRate * 100}% of ${formatEuro(PROJECT_CONSTANTS.approvedSubsidyBudget)}`}
         />
       </div>
 

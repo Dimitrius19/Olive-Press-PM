@@ -25,9 +25,11 @@ import {
 import {
   generateEstimate,
   KEY_VARIANCES,
+  LESVOS_PREMIUMS,
   type BoQCategory,
   type BottomUpEstimate,
 } from "../lib/bottom-up-estimate";
+import { PROJECT_CONSTANTS } from "../data/seed";
 import { useMarketData, type MarketDataPoint } from "../hooks/useMarketData";
 import { useBudgetLines } from "../hooks/useBudget";
 import {
@@ -227,7 +229,7 @@ function BenchmarkRangeBar({
 }) {
   const range = high - low;
   const midPos = range > 0 ? ((mid - low) / range) * 100 : 50;
-  const valuePos = range > 0 ? Math.max(0, Math.min(110, ((value - low) / range) * 100)) : 50;
+  const valuePos = range > 0 ? Math.max(0, Math.min(100, ((value - low) / range) * 100)) : 50;
   const isPercent = unit === "% of construction";
   const formatVal = (n: number) =>
     isPercent
@@ -238,11 +240,22 @@ function BenchmarkRangeBar({
 
   return (
     <div className="mt-2">
-      <div className="flex justify-between text-[10px] text-stone-400 mb-1">
-        <span>Low: {formatVal(low)}</span>
-        <span>Mid: {formatVal(mid)}</span>
-        <span>High: {formatVal(high)}</span>
+      {/* Low / Mid / High labels ABOVE the bar */}
+      <div className="relative h-4 mb-1">
+        <span className="absolute left-0 text-[10px] text-stone-400 min-w-0 overflow-hidden truncate">
+          Low: {formatVal(low)}
+        </span>
+        <span
+          className="absolute text-[10px] text-stone-400 min-w-0 overflow-hidden truncate"
+          style={{ left: `${midPos}%`, transform: "translateX(-50%)" }}
+        >
+          Mid: {formatVal(mid)}
+        </span>
+        <span className="absolute right-0 text-[10px] text-stone-400 min-w-0 overflow-hidden truncate">
+          High: {formatVal(high)}
+        </span>
       </div>
+      {/* Bar */}
       <div className="relative h-4 rounded-full bg-gradient-to-r from-emerald-100 via-amber-100 to-red-100">
         {/* Mid marker */}
         <div
@@ -252,12 +265,15 @@ function BenchmarkRangeBar({
         {/* Value marker */}
         <div
           className="absolute top-0 h-4 w-1.5 bg-stone-800 rounded-full"
-          style={{ left: `${Math.min(valuePos, 100)}%` }}
+          style={{ left: `${valuePos}%` }}
         />
+      </div>
+      {/* ANICON marker label BELOW the bar */}
+      <div className="relative h-4 mt-0.5">
         <div
-          className="absolute -top-5 text-[10px] font-bold text-stone-800 whitespace-nowrap"
+          className="absolute text-[10px] font-bold text-stone-800 whitespace-nowrap min-w-0 overflow-hidden"
           style={{
-            left: `${Math.min(valuePos, 100)}%`,
+            left: `${valuePos}%`,
             transform: "translateX(-50%)",
           }}
         >
@@ -336,7 +352,7 @@ const INDEX_LABELS: Record<IndexType, string> = {
   blend: "Blend",
 };
 
-const MIDPOINT_OPTIONS = ["2026-Q4", "2027-Q1", "2027-Q2", "2027-Q3", "2027-Q4"];
+const CONSTRUCTION_MIDPOINT = "2027-Q2";
 
 function fmtK(n: number): string {
   if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -372,7 +388,7 @@ function riskRowBg(risk: "low" | "medium" | "high"): string {
 export function MarketCheck() {
   const { data, isLoading, error } = useMarketData();
   const { data: budgetLines } = useBudgetLines();
-  const [midpoint, setMidpoint] = useState("2027-Q2");
+  const midpoint = CONSTRUCTION_MIDPOINT;
   const [activeTab, setActiveTab] = useState<TabKey>("indices");
   const [benchmarkTableOpen, setBenchmarkTableOpen] = useState(false);
 
@@ -903,26 +919,16 @@ export function MarketCheck() {
             </div>
           </div>
 
-          {/* Risk Heatmap Table with inline midpoint selector */}
+          {/* Explanation */}
+          <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 text-xs text-stone-600 leading-relaxed">
+            Projecting how material costs may change between the ANICON estimate (March 2026)
+            and the bulk of construction spending (mid-2027). Each budget line is mapped to the
+            most relevant price index.
+          </div>
+
+          {/* Inflation Exposure by Budget Line */}
           <Card>
-            <div className="flex items-center justify-between mb-4">
-              <SectionTitle>Risk Heatmap</SectionTitle>
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-stone-500">Midpoint:</label>
-                <select
-                  className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                  value={midpoint}
-                  onChange={(e) => setMidpoint(e.target.value)}
-                >
-                  {MIDPOINT_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                      {opt === "2027-Q2" ? " (default)" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <SectionTitle>Inflation Exposure by Budget Line</SectionTitle>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -1343,6 +1349,50 @@ export function MarketCheck() {
       {/* ===== Tab: Bottom-Up Estimate ===== */}
       {activeTab === "bottomup" && (
         <div className="space-y-6">
+          {/* Disclaimer */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5">
+            <div className="flex items-start gap-3">
+              <Info size={20} className="text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-stone-700 leading-relaxed">
+                This independent estimate serves as a secondary reference point alongside
+                ANICON&apos;s professional assessment. It is based on publicly available unit rates and
+                estimated quantities from the architectural report &mdash; <strong>NOT</strong> a substitute for
+                ANICON&apos;s detailed analysis which benefits from direct engagement with the design team
+                and site knowledge. Differences between the two estimates highlight areas for further
+                discussion during the detailed design phase.
+              </p>
+            </div>
+          </div>
+
+          {/* Lesvos-specific adjustments */}
+          <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+            <div className="flex items-start gap-2">
+              <Info size={16} className="text-stone-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-stone-600 tracking-wider mb-2">
+                  Lesvos Island Premiums Applied
+                </p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-stone-600">
+                  <div>
+                    <p className="font-semibold text-stone-700">+{LESVOS_PREMIUMS.ferryLogistics * 100}% Ferry Logistics</p>
+                    <p className="text-stone-400">All material deliveries</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-stone-700">+{LESVOS_PREMIUMS.specializedLabor * 100}% Specialist Labor</p>
+                    <p className="text-stone-400">Off-island workers</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-stone-700">+{LESVOS_PREMIUMS.heritageMaterialsLow * 100}&ndash;{LESVOS_PREMIUMS.heritageMaterialsHigh * 100}% Heritage Materials</p>
+                    <p className="text-stone-400">Lime plaster, Byzantine tiles</p>
+                  </div>
+                  <div className="col-span-2 md:col-span-1">
+                    <p className="text-stone-400 italic">{LESVOS_PREMIUMS.note}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Comparison Card — side by side */}
           <div
             className={`rounded-xl border p-5 ${
@@ -1388,6 +1438,32 @@ export function MarketCheck() {
               </p>
             </div>
           </div>
+
+          {/* State Subsidy Note */}
+          {PROJECT_CONSTANTS.stateSubsidy > 0 && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+              <div className="flex items-start gap-2">
+                <Info size={16} className="text-emerald-600 mt-0.5 shrink-0" />
+                <p className="text-xs text-stone-700 leading-relaxed">
+                  The approved state subsidy of{" "}
+                  <span className="font-bold">
+                    {fmtEur(PROJECT_CONSTANTS.stateSubsidy)}
+                  </span>{" "}
+                  ({"\u0391\u03BD\u03B1\u03C0\u03C4\u03C5\u03BE\u03B9\u03B1\u03BA\u03CC\u03C2 \u039D\u03CC\u03BC\u03BF\u03C2"}, {PROJECT_CONSTANTS.subsidyRate * 100}% of{" "}
+                  {fmtEur(PROJECT_CONSTANTS.approvedSubsidyBudget)} approved budget) further reduces the
+                  net investment to{" "}
+                  <span className="font-bold">
+                    {fmtEur(bottomUpEstimate.comparisonWithAnicon.aniconTotal - PROJECT_CONSTANTS.stateSubsidy)}
+                  </span>{" "}
+                  (ANICON) or{" "}
+                  <span className="font-bold">
+                    {fmtEur(bottomUpEstimate.totalExclVat - PROJECT_CONSTANTS.stateSubsidy)}
+                  </span>{" "}
+                  (bottom-up), significantly improving project returns.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Cost Summary — compact 4-column grid */}
           <Card>
@@ -1500,57 +1576,65 @@ export function MarketCheck() {
                       </span>
                     </button>
                     {isExpanded && (
-                      <div className="overflow-x-auto pb-3">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b border-stone-200 text-left">
-                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider">
-                                Description
-                              </th>
-                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
-                                Qty
-                              </th>
-                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-center">
-                                Unit
-                              </th>
-                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
-                                Rate
-                              </th>
-                              <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
-                                Total
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {cat.lines.map((l) => (
-                              <tr
-                                key={l.id}
-                                className="border-b border-stone-50 hover:bg-stone-50/50"
-                              >
-                                <td className="py-1.5 px-2 text-stone-700">
-                                  <div>{l.description}</div>
-                                  <div className="text-[10px] text-stone-400">{l.notes}</div>
-                                </td>
-                                <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
-                                  {l.unit === "ls"
-                                    ? "1"
-                                    : l.quantity.toLocaleString("en-IE")}
-                                </td>
-                                <td className="py-1.5 px-2 text-center text-stone-500 text-xs">
-                                  {l.unit}
-                                </td>
-                                <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
-                                  {l.unit === "ls"
-                                    ? "--"
-                                    : fmtEur(l.unitRate)}
-                                </td>
-                                <td className="py-1.5 px-2 text-right tabular-nums text-stone-800 font-mono font-semibold">
-                                  {fmtEur(l.total)}
-                                </td>
+                      <div className="pb-3">
+                        {/* Rationale */}
+                        {cat.rationale && (
+                          <p className="text-xs text-stone-600 italic leading-relaxed px-2 py-3 bg-amber-50/40 rounded-lg mx-2 mb-3">
+                            {cat.rationale}
+                          </p>
+                        )}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-stone-200 text-left">
+                                <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider">
+                                  Description
+                                </th>
+                                <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
+                                  Qty
+                                </th>
+                                <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-center">
+                                  Unit
+                                </th>
+                                <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
+                                  Rate
+                                </th>
+                                <th className="py-1.5 px-2 text-[10px] font-semibold text-stone-500 tracking-wider text-right">
+                                  Total
+                                </th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {cat.lines.map((l) => (
+                                <tr
+                                  key={l.id}
+                                  className="border-b border-stone-50 hover:bg-stone-50/50"
+                                >
+                                  <td className="py-1.5 px-2 text-stone-700">
+                                    <div>{l.description}</div>
+                                    <div className="text-[10px] text-stone-400">{l.notes}</div>
+                                  </td>
+                                  <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
+                                    {l.unit === "ls"
+                                      ? "1"
+                                      : l.quantity.toLocaleString("en-IE")}
+                                  </td>
+                                  <td className="py-1.5 px-2 text-center text-stone-500 text-xs">
+                                    {l.unit}
+                                  </td>
+                                  <td className="py-1.5 px-2 text-right tabular-nums text-stone-700 font-mono">
+                                    {l.unit === "ls"
+                                      ? "--"
+                                      : fmtEur(l.unitRate)}
+                                  </td>
+                                  <td className="py-1.5 px-2 text-right tabular-nums text-stone-800 font-mono font-semibold">
+                                    {fmtEur(l.total)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>

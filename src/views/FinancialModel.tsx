@@ -22,6 +22,7 @@ import {
 import {
   SCENARIOS,
   INVESTMENT,
+  STATE_SUBSIDY_DEFAULT,
   ROOMS,
   OPERATING_DAYS_FULL,
   MODEL_YEARS,
@@ -182,6 +183,7 @@ function TargetYieldSolver({
 export function FinancialModel() {
   // Editable global parameters
   const [investment, setInvestment] = useState(INVESTMENT);
+  const [stateSubsidy, setStateSubsidy] = useState(STATE_SUBSIDY_DEFAULT);
   const [rooms, setRooms] = useState(ROOMS);
   const [operatingDays, setOperatingDays] = useState(OPERATING_DAYS_FULL);
   const [modelYears, setModelYears] = useState(MODEL_YEARS);
@@ -218,6 +220,7 @@ export function FinancialModel() {
   const resetDefaults = useCallback(() => {
     setScenarioInputs(SCENARIOS.map((s) => ({ ...s })));
     setInvestment(INVESTMENT);
+    setStateSubsidy(STATE_SUBSIDY_DEFAULT);
     setRooms(ROOMS);
     setOperatingDays(OPERATING_DAYS_FULL);
     setModelYears(MODEL_YEARS);
@@ -245,9 +248,10 @@ export function FinancialModel() {
           rooms,
           operatingDays,
           modelYears,
+          stateSubsidy,
         ),
       ),
-    [scenarioInputs, investment, rooms, operatingDays, modelYears, corporateTaxRate, propertyTaxAnnual, ltvPct, interestRate, loanTermYears],
+    [scenarioInputs, investment, stateSubsidy, rooms, operatingDays, modelYears, corporateTaxRate, propertyTaxAnnual, ltvPct, interestRate, loanTermYears],
   );
 
   // Cash flow chart data
@@ -349,7 +353,7 @@ export function FinancialModel() {
               <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-3">
                 Global Parameters
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="space-y-1">
                   <label className="text-xs text-stone-500">
                     Total Investment
@@ -431,7 +435,45 @@ export function FinancialModel() {
                     <span className="text-xs text-stone-400">years</span>
                   </div>
                 </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-stone-500">
+                    State Subsidy
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-stone-400">&euro;</span>
+                    <input
+                      type="number"
+                      value={parseFloat((stateSubsidy / 1_000_000).toFixed(2))}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value);
+                        if (!isNaN(v))
+                          setStateSubsidy(
+                            Math.min(5_000_000, Math.max(0, v * 1_000_000)),
+                          );
+                      }}
+                      min={0}
+                      max={5}
+                      step={0.1}
+                      className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    />
+                    <span className="text-xs text-stone-400">M</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-600">
+                    {stateSubsidy > 0 ? `Net: ${fmtEuroM(investment - stateSubsidy)}` : "No subsidy"}
+                  </p>
+                </div>
               </div>
+              {stateSubsidy > 0 && (
+                <div className="mt-3 flex items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                  <div className="text-xs text-emerald-800">
+                    <span className="font-semibold">Gross Investment: {fmtEuroM(investment)}</span>
+                    <span className="mx-2">|</span>
+                    <span className="font-semibold">Net Investment (after subsidy): {fmtEuroM(investment - stateSubsidy)}</span>
+                    <span className="mx-2">|</span>
+                    <span className="text-emerald-600">{"\u0391\u03BD\u03B1\u03C0\u03C4\u03C5\u03BE\u03B9\u03B1\u03BA\u03CC\u03C2 \u039D\u03CC\u03BC\u03BF\u03C2"} ({((stateSubsidy / 6_000_000) * 100).toFixed(0)}% of {fmtEuroM(6_000_000)} approved)</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <hr className="border-stone-100" />
@@ -716,11 +758,16 @@ export function FinancialModel() {
 
               <div className="mb-3">
                 <p className="text-xs text-stone-500 uppercase tracking-wide">
-                  IRR
+                  {stateSubsidy > 0 ? "Net IRR (after subsidy)" : "IRR"}
                 </p>
                 <p className={`text-3xl font-bold ${style.text}`}>
-                  {fmtPct(result.irr)}
+                  {stateSubsidy > 0 ? fmtPct(result.netIrr) : fmtPct(result.irr)}
                 </p>
+                {stateSubsidy > 0 && (
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Gross IRR: {fmtPct(result.irr)}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-sm">
@@ -757,10 +804,15 @@ export function FinancialModel() {
               <div className="mt-4 pt-3 border-t border-stone-200/60">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-stone-400">Yield on Cost</p>
-                    <p className={`text-xl font-bold ${result.yieldOnCost >= 0.06 ? "text-emerald-600" : result.yieldOnCost >= 0.04 ? "text-amber-600" : "text-red-600"}`}>
-                      {fmtPct(result.yieldOnCost)}
+                    <p className="text-xs text-stone-400">{stateSubsidy > 0 ? "Net Yield on Cost" : "Yield on Cost"}</p>
+                    <p className={`text-xl font-bold ${(stateSubsidy > 0 ? result.netYieldOnCost : result.yieldOnCost) >= 0.06 ? "text-emerald-600" : (stateSubsidy > 0 ? result.netYieldOnCost : result.yieldOnCost) >= 0.04 ? "text-amber-600" : "text-red-600"}`}>
+                      {fmtPct(stateSubsidy > 0 ? result.netYieldOnCost : result.yieldOnCost)}
                     </p>
+                    {stateSubsidy > 0 && (
+                      <p className="text-[10px] text-stone-400">
+                        Gross: {fmtPct(result.yieldOnCost)}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-stone-400">Stabilized NOI</p>

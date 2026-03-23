@@ -62,6 +62,12 @@ export interface ScenarioResult {
   loanAmount: number;
   annualDebtService: number;
   debtServiceCoverageRatio: number; // stabilized NOI / debt service (should be >1.2)
+  grossInvestment: number;
+  stateSubsidy: number;
+  effectiveInvestment: number; // grossInvestment - stateSubsidy
+  netIrr: number; // IRR calculated on effective investment
+  netYieldOnCost: number; // Stabilized NOI / effective investment
+  netAfterTaxYieldOnCost: number;
 }
 
 export const SCENARIOS: ScenarioInputs[] = [
@@ -122,6 +128,7 @@ export const SCENARIOS: ScenarioInputs[] = [
 ];
 
 export const INVESTMENT = 10_557_940;
+export const STATE_SUBSIDY_DEFAULT = 3_000_000; // Αναπτυξιακός Νόμος — 50% of €6M approved
 export const ROOMS = 48;
 export const OPERATING_DAYS_FULL = 180;
 export const OPERATING_DAYS_YEAR1 = 120;
@@ -169,6 +176,7 @@ export function runScenario(
   rooms = ROOMS,
   operatingDaysFull = OPERATING_DAYS_FULL,
   modelYears = MODEL_YEARS,
+  stateSubsidy = 0,
 ): ScenarioResult {
   const operatingDaysYear1 = Math.round(operatingDaysFull * (OPERATING_DAYS_YEAR1 / OPERATING_DAYS_FULL));
   const projections: YearProjection[] = [];
@@ -331,6 +339,23 @@ export function runScenario(
     ? stabilizedNoi / annualDebtService
     : Infinity;
 
+  // Net metrics (after state subsidy)
+  const effectiveInvestment = investment - stateSubsidy;
+
+  // Net IRR: same cash flows but Year 0 = -effectiveInvestment
+  const netCashFlows: number[] = [-effectiveInvestment];
+  for (let i = 0; i < projections.length; i++) {
+    const cf =
+      i === projections.length - 1
+        ? projections[i].noi + terminalValue
+        : projections[i].noi;
+    netCashFlows.push(cf);
+  }
+  const netIrr = effectiveInvestment > 0 ? calculateIRR(netCashFlows) : irr;
+
+  const netYieldOnCost = effectiveInvestment > 0 ? stabilizedNoi / effectiveInvestment : 0;
+  const netAfterTaxYieldOnCost = effectiveInvestment > 0 ? stabilizedAfterTaxNoi / effectiveInvestment : 0;
+
   return {
     inputs,
     projections,
@@ -350,6 +375,12 @@ export function runScenario(
     loanAmount,
     annualDebtService,
     debtServiceCoverageRatio,
+    grossInvestment: investment,
+    stateSubsidy,
+    effectiveInvestment,
+    netIrr,
+    netYieldOnCost,
+    netAfterTaxYieldOnCost,
   };
 }
 
@@ -361,6 +392,7 @@ export function solveAdrForTargetYield(
   rooms = ROOMS,
   operatingDaysFull = OPERATING_DAYS_FULL,
   modelYears = MODEL_YEARS,
+  stateSubsidy = 0,
 ): number {
   // Binary search for ADR that produces the target after-tax YoC
   let low = 50;
@@ -368,7 +400,7 @@ export function solveAdrForTargetYield(
   for (let i = 0; i < 50; i++) {
     const mid = (low + high) / 2;
     const testInputs = { ...baseInputs, adrYear1: mid };
-    const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears);
+    const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears, stateSubsidy);
     if (result.afterTaxYieldOnCost < targetYield) {
       low = mid;
     } else {
@@ -386,13 +418,14 @@ export function solveOccupancyForTargetYield(
   rooms = ROOMS,
   operatingDaysFull = OPERATING_DAYS_FULL,
   modelYears = MODEL_YEARS,
+  stateSubsidy = 0,
 ): number {
   let low = 0.1;
   let high = 0.99;
   for (let i = 0; i < 50; i++) {
     const mid = (low + high) / 2;
     const testInputs = { ...baseInputs, occupancyMature: mid, occupancyYear1: mid * 0.85 };
-    const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears);
+    const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears, stateSubsidy);
     if (result.afterTaxYieldOnCost < targetYield) {
       low = mid;
     } else {

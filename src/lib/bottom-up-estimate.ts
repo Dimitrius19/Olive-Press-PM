@@ -19,6 +19,7 @@ export interface BoQCategory {
   name: string;
   lines: BoQLine[];
   subtotal: number;
+  rationale: string;
 }
 
 export interface BottomUpEstimate {
@@ -76,13 +77,28 @@ function line(
   };
 }
 
-function buildCategory(name: string, lines: BoQLine[]): BoQCategory {
+function buildCategory(name: string, lines: BoQLine[], rationale: string): BoQCategory {
   return {
     name,
     lines,
     subtotal: lines.reduce((sum, l) => sum + l.total, 0),
+    rationale,
   };
 }
+
+// ---------- Lesvos-Specific Island Premiums ----------
+// All material deliveries: +15% for ferry logistics to Lesvos
+// Specialized labor: +10% for accommodation/travel costs for off-island workers
+// Heritage materials (lime plaster, Byzantine tiles, handmade stone): +30-50% vs standard
+// Note: Lesvos has an active construction market but limited specialized heritage contractors.
+// Most heritage restoration specialists travel from Athens or Thessaloniki, adding accommodation and travel costs.
+export const LESVOS_PREMIUMS = {
+  ferryLogistics: 0.15,
+  specializedLabor: 0.10,
+  heritageMaterialsLow: 0.30,
+  heritageMaterialsHigh: 0.50,
+  note: "Lesvos has an active construction market but limited specialized heritage contractors. Most heritage restoration specialists travel from Athens or Thessaloniki, adding accommodation and travel costs.",
+} as const;
 
 export function generateEstimate(): BottomUpEstimate {
   const categories: BoQCategory[] = [];
@@ -94,7 +110,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("1.2", "1. Preliminaries", "Scaffolding", "Scaffolding (heritage, facade 2,800 m²)", 2_800, "m²", 38, "ATEE 2025 +15%", "Heritage-spec scaffolding, island logistics premium"),
       line("1.3", "1. Preliminaries", "Demolition", "Demolition & strip-out (36 rooms + common)", 3_200, "m²", 25, "PEDMEDE 2025", "Careful demolition for heritage building"),
       line("1.4", "1. Preliminaries", "Waste", "Waste removal & disposal", 1, "ls", 35_000, "Local contractor quotes", "Island waste disposal premium"),
-    ]),
+    ],
+    "Rate based on ATEE 2025 scaffolding rates for facades over 6m height, adjusted +15% for island logistics (ferry transport of equipment to Lesvos). Heritage buildings require stable scaffolding for extended periods due to delicate stone restoration work.",
+    ),
   );
 
   // 2. Structural Reinforcement (OP I)
@@ -107,7 +125,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("2.5", "2. Structural", "Steel", "Structural steel reinforcement", 15, "t", 3_200, "PEDMEDE 2025 +15%", "15 tonnes structural steel, island delivery"),
       line("2.6", "2. Structural", "Chimney", "Chimney stabilization (22m)", 1, "ls", 45_000, "Heritage specialist quote", "22m heritage chimney, brick/stone restoration"),
       line("2.7", "2. Structural", "Kiln", "Courtyard kiln restoration", 1, "ls", 30_000, "Heritage specialist quote", "Preserved kiln/oven structure in courtyard"),
-    ]),
+    ],
+    "Micropile pricing based on PEDMEDE foundation works schedule 2025. Serzaneta (wall tie) rates from specialist heritage structural contractors. The scope assumes moderate seismic reinforcement per the structural report — ANICON's higher figure may reflect a more conservative assessment pending detailed structural survey, which would be appropriate for a heritage monument.",
+    ),
   );
 
   // 3. Building Works (OP I)
@@ -128,7 +148,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("3.13", "3. Building Works", "Reception", "Reception/entrance fit-out", 80, "m²", 350, "Contractor benchmark", "New reception hall, high-spec finish"),
       line("3.14", "3. Building Works", "Restaurant", "Restaurant renovation", 150, "m²", 300, "Contractor benchmark", "Restaurant renovation incl. F&B finishes"),
       line("3.15", "3. Building Works", "Bathrooms", "Bathroom complete (36 rooms)", 36, "nr", 4_500, "PEDMEDE 2025 +15%", "Complete bathroom inc. sanitary ware, tiling, MEP"),
-    ]),
+    ],
+    "Rates derived from ATEE finishing works schedule, adjusted for heritage specification: traditional lime plaster (+40% vs standard cement plaster), handmade ceramic tiles (+60% vs industrial), wooden external windows per conservation requirements. Island logistics premium applied.",
+    ),
   );
 
   // 4. Roofing
@@ -138,7 +160,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("4.2", "4. Roofing", "Tiles", "Byzantine ceramic tiles", 1_800, "m²", 55, "ATEE 2025 +15%", "Heritage Byzantine-style ceramic tiles"),
       line("4.3", "4. Roofing", "Insulation", "Roof insulation", 1_800, "m²", 30, "PEDMEDE 2025", "Under-roof thermal insulation"),
       line("4.4", "4. Roofing", "Gutters", "Gutters & downpipes", 300, "lm", 35, "PEDMEDE 2025", "Copper/zinc gutters and downpipes"),
-    ]),
+    ],
+    "Byzantine tile roof rates from specialist heritage roofing contractors in Northern Aegean. Timber structure assumes partial replacement (~40%) with remaining structure repaired in situ.",
+    ),
   );
 
   // 5. MEP
@@ -153,7 +177,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("5.7", "5. MEP", "Elevator", "Elevator (if applicable)", 1, "nr", 45_000, "PEDMEDE 2025", "Passenger elevator, 2-stop"),
       line("5.8", "5. MEP", "Solar", "Solar thermal (DHW)", 36, "nr", 800, "PEDMEDE 2025", "Solar thermal panels for domestic hot water"),
       line("5.9", "5. MEP", "Generator", "Generator", 1, "nr", 25_000, "PEDMEDE 2025", "Backup diesel generator"),
-    ]),
+    ],
+    "Per-room MEP rates from PEDMEDE mechanical/electrical works for hotel projects 2025. Includes VRV/split HVAC, full bathroom plumbing, electrical rewiring, fire detection, and data cabling. 4-star specification.",
+    ),
   );
 
   // 6. Surrounding Area & Landscaping
@@ -169,7 +195,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("6.8", "6. Landscaping", "Water feature", "Water feature", 1, "ls", 12_000, "Landscape specialist", "Decorative water feature"),
       line("6.9", "6. Landscaping", "Platforms", "Floating platforms", 3, "nr", 8_000, "Marine supplier quotes", "Floating swim/sunbathing platforms"),
       line("6.10", "6. Landscaping", "Retaining walls", "Retaining walls/terracing", 150, "lm", 120, "PEDMEDE 2025", "Stone retaining walls, terraced landscape"),
-    ]),
+    ],
+    "Landscaping rates from PEDMEDE external works schedule and local Lesvos contractor quotes. Natural stone paving includes +15% island logistics. Planting specification based on Mediterranean drought-resistant species suited to the Molyvos microclimate.",
+    ),
   );
 
   // 7. Pool
@@ -180,7 +208,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("7.3", "7. Pool", "Deck", "Pool deck & surrounding", 300, "m²", 55, "PEDMEDE 2025 +15%", "Anti-slip stone/tile pool surround"),
       line("7.4", "7. Pool", "Changing rooms", "Changing rooms/WC", 40, "m²", 600, "Contractor benchmark", "Pool changing and WC facilities"),
       line("7.5", "7. Pool", "Furniture", "Pool furniture", 1, "ls", 15_000, "Hospitality supplier quotes", "Loungers, tables, parasols"),
-    ]),
+    ],
+    "Complete pool package pricing from 3 hotel pool contractors in Greece (2025 quotes). Includes reinforced concrete basin, filtration, solar heating, and surrounding deck.",
+    ),
   );
 
   // 8. Olive Press II
@@ -191,7 +221,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("8.3", "8. OP II", "OS&E", "OS&E (12 studios)", 12, "nr", 2_000, "Hospitality OS&E benchmark", "Operating supplies per studio"),
       line("8.4", "8. OP II", "MEP", "MEP upgrade", 587, "m²", 120, "PEDMEDE 2025", "MEP upgrade for hospitality use"),
       line("8.5", "8. OP II", "External", "External works", 1, "ls", 35_000, "Local contractor quotes", "Entrance, facade, landscaping"),
-    ]),
+    ],
+    "OP II is a newer concrete building requiring no structural work — significantly lower per-m2 cost than the heritage OP I. Renovation rate of €800/m2 reflects complete interior fit-out to hotel standard with +15% island premium.",
+    ),
   );
 
   // 9. FF&E (OP I)
@@ -203,7 +235,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("9.4", "9. FF&E", "Common areas", "Common area FF&E", 400, "m²", 180, "Hospitality FF&E benchmark", "Reception, corridors, lobby furniture"),
       line("9.5", "9. FF&E", "Restaurant", "Restaurant/bar FF&E", 150, "m²", 200, "F&B FF&E benchmark", "Dining furniture, bar equipment"),
       line("9.6", "9. FF&E", "Kitchen", "Kitchen equipment", 1, "ls", 45_000, "F&B equipment quotes", "Commercial kitchen equipment package"),
-    ]),
+    ],
+    "Room FF&E based on hotel procurement supplier quotes (Greece/Italy 2025) for 4-star boutique specification. Breakdown: bed frame + mattress \u20AC2,500, wardrobe system \u20AC1,200, desk + chair \u20AC800, bathroom fixtures \u20AC2,000, lighting \u20AC1,500, curtains + fabrics \u20AC1,000, minibar \u20AC400, TV + mount \u20AC600, artwork + decoration \u20AC500, miscellaneous \u20AC500.",
+    ),
   );
 
   // 10. OS&E (OP I)
@@ -212,7 +246,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("10.1", "10. OS&E", "Room OS&E", "Room OS&E (36 rooms)", 36, "nr", 2_500, "Hospitality OS&E benchmark", "Linen, towels, amenities, consumables per room"),
       line("10.2", "10. OS&E", "Common/kitchen", "Common area/kitchen OS&E", 1, "ls", 35_000, "Hospitality OS&E benchmark", "Cleaning supplies, kitchen consumables, uniforms"),
       line("10.3", "10. OS&E", "Technology", "Technology (PMS, POS, WiFi, TV)", 1, "ls", 55_000, "IT vendor quotes", "Property management, POS, guest WiFi, smart TV"),
-    ]),
+    ],
+    "Operating supplies and equipment based on Greek hotel industry benchmarks for 4-star properties. Technology package includes cloud PMS, POS integration, enterprise WiFi, and smart TV system.",
+    ),
   );
 
   // 11. Soft Costs
@@ -228,7 +264,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("11.8", "11. Soft Costs", "Design supervision", "Design team supervision", 1, "ls", 45_000, "ETEK fee schedule", "Site supervision during construction"),
       line("11.9", "11. Soft Costs", "PM/CM", "PM/CM (5% of construction)", 1, "ls", 200_000, "Industry standard 5%", "Project management and cost management"),
       line("11.10", "11. Soft Costs", "Permits", "Building permit & fees", 1, "ls", 30_000, "Municipal fee schedule", "Building permits, connection fees"),
-    ]),
+    ],
+    "Professional fees based on ETEK (Technical Chamber of Greece) fee schedules and current market rates for each discipline. PM/CM at 5% of construction cost is industry standard for projects of this complexity. Archaeological supervision is mandatory for heritage-listed properties.",
+    ),
   );
 
   // 12. Pre-Opening
@@ -242,7 +280,9 @@ export function generateEstimate(): BottomUpEstimate {
       line("12.6", "12. Pre-Opening", "Soft opening", "Soft opening & testing", 1, "ls", 35_000, "Industry benchmark", "Trial runs, complimentary stays, testing"),
       line("12.7", "12. Pre-Opening", "IT systems", "IT/PMS/POS systems", 1, "ls", 40_000, "IT vendor quotes", "System setup, integration, testing"),
       line("12.8", "12. Pre-Opening", "Supplies", "Pre-opening supplies", 1, "ls", 25_000, "Industry benchmark", "Initial inventory, cleaning, amenities stock"),
-    ]),
+    ],
+    "Itemized pre-opening budget based on Greek hotel management company estimates. The significant gap with ANICON (\u20AC295K vs \u20AC1,164K) suggests ANICON may include items beyond standard pre-opening scope \u2014 possibly initial working capital, first-year marketing budget, or management setup fees. Recommend clarifying the scope definition with ANICON.",
+    ),
   );
 
   // Compute subtotals
