@@ -843,6 +843,29 @@ export function FinancialModel() {
                 </div>
               </div>
 
+              {/* Yield on Equity (post-subsidy, post-debt) */}
+              {result.ownerEquity > 0 && result.ownerEquity < result.grossInvestment && (
+                <div className="mt-3 pt-3 border-t border-stone-200/60">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-stone-400">Yield on Equity</p>
+                      <p className={`text-xl font-bold ${result.yieldOnEquity >= 0.08 ? "text-emerald-600" : result.yieldOnEquity >= 0.05 ? "text-amber-600" : "text-red-600"}`}>
+                        {fmtPct(result.yieldOnEquity)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-stone-400">Owner Equity</p>
+                      <p className="font-semibold text-stone-700 text-sm">
+                        {fmtEuroM(result.ownerEquity)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-stone-400 mt-1">
+                    After-tax NOI / (Investment − Subsidy{hasDebt ? " − Debt" : ""})
+                  </p>
+                </div>
+              )}
+
               {/* Leveraged section (only if LTV > 0) */}
               {hasDebt && (
                 <div className="mt-3 pt-3 border-t border-stone-200/60 space-y-2">

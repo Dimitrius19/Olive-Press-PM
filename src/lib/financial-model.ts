@@ -68,6 +68,9 @@ export interface ScenarioResult {
   netIrr: number; // IRR calculated on effective investment
   netYieldOnCost: number; // Stabilized NOI / effective investment
   netAfterTaxYieldOnCost: number;
+  // Yield on Equity: after-tax NOI / actual owner equity (investment - subsidy - debt)
+  yieldOnEquity: number;
+  ownerEquity: number; // effectiveInvestment - loanAmount
 }
 
 export const SCENARIOS: ScenarioInputs[] = [
@@ -381,6 +384,13 @@ export function runScenario(
     netIrr,
     netYieldOnCost,
     netAfterTaxYieldOnCost,
+    // Yield on Equity = After-tax NOI / Owner's actual equity
+    // Owner equity = investment - subsidy - debt
+    ownerEquity: Math.max(0, effectiveInvestment - loanAmount),
+    yieldOnEquity:
+      effectiveInvestment - loanAmount > 0
+        ? stabilizedAfterTaxNoi / (effectiveInvestment - loanAmount)
+        : 0,
   };
 }
 
