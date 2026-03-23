@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 // Eurostat Statistics API (JSON-stat format) — free, no key required
-async function fetchEurostat(indicatorCode: string, sAdj = "NSA") {
-  const url = `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_copi_q?geo=EL&indic_bt=${indicatorCode}&s_adj=${sAdj}&unit=I15&freq=Q&lastTimePeriod=12`;
+async function fetchEurostat(indicatorCode: string, periods = 20) {
+  const url = `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_copi_q?geo=EL&indic_bt=${indicatorCode}&s_adj=NSA&unit=I15&freq=Q&lastTimePeriod=${periods}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Eurostat ${res.status}`);
   return res.json();
@@ -10,7 +10,7 @@ async function fetchEurostat(indicatorCode: string, sAdj = "NSA") {
 
 // Eurostat CPI/HICP for Greece
 async function fetchEurostatCPI() {
-  const url = `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_midx?geo=EL&coicop=CP00&unit=I15&freq=M&lastTimePeriod=24`;
+  const url = `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/prc_hicp_midx?geo=EL&coicop=CP00&unit=I15&freq=M&lastTimePeriod=36`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Eurostat CPI ${res.status}`);
   return res.json();
@@ -28,32 +28,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const results: Record<string, unknown> = {};
   const errors: string[] = [];
 
-  // Construction Cost Index (overall)
+  // Construction Cost Index (overall) — 12 quarters of data from 2021-Q1
   try {
-    results.constructionCostIndex = await fetchEurostat("COST");
+    results.constructionCostIndex = await fetchEurostat("COST", 20);
   } catch (e: unknown) {
     errors.push(`Construction Cost Index: ${(e as Error).message}`);
   }
 
-  // Construction Producer Prices
+  // Construction Producer Prices — 12 quarters of data
   try {
-    results.materialPriceIndex = await fetchEurostat("PRC_PRR");
+    results.materialPriceIndex = await fetchEurostat("PRC_PRR", 20);
   } catch (e: unknown) {
     errors.push(`Producer Price Index: ${(e as Error).message}`);
   }
 
-  // Also fetch the detailed material price index from a different dataset
-  try {
-    const url = `https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/sts_copi_m?geo=EL&indic_bt=COST&s_adj=NSA&unit=I15&freq=M&lastTimePeriod=24`;
-    const res = await fetch(url);
-    if (res.ok) {
-      results.labourCostIndex = await res.json();
-    }
-  } catch (e: unknown) {
-    errors.push(`Monthly Cost Index: ${(e as Error).message}`);
-  }
-
-  // Greece CPI (HICP) from Eurostat
+  // Greece CPI (HICP) from Eurostat — 36 months
   try {
     results.cpiGreece = await fetchEurostatCPI();
   } catch (e: unknown) {
