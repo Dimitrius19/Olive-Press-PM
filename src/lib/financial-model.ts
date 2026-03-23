@@ -10,6 +10,13 @@ export interface ScenarioInputs {
   otherRevenuePct: number;
   capexReservePct: number;
   terminalCapRate: number;
+  // Tax
+  corporateTaxRate: number; // default 0.22 (Greece 22%)
+  propertyTaxAnnual: number; // default 15000 (ENFIA estimate)
+  // Debt Financing
+  ltvPct: number; // Loan-to-Value, default 0 (no debt), range 0-0.80
+  interestRate: number; // default 0.045 (4.5%)
+  loanTermYears: number; // default 15
 }
 
 export interface YearProjection {
@@ -28,6 +35,12 @@ export interface YearProjection {
   noi: number;
   cumulativeNoi: number;
   fcf: number;
+  incomeTax: number;
+  propertyTax: number;
+  afterTaxNoi: number;
+  debtService: number; // annual mortgage payment (P+I)
+  leveragedCashFlow: number; // afterTaxNoi - debtService
+  cumulativeLeveragedCf: number;
 }
 
 export interface ScenarioResult {
@@ -42,6 +55,13 @@ export interface ScenarioResult {
   yieldOnCost: number; // Stabilized NOI (Year 3) / Investment
   cashOnCash: number; // Same as YoC when no debt
   stabilizedNoi: number; // Year 3 NOI
+  afterTaxIrr: number;
+  afterTaxYieldOnCost: number;
+  leveragedIrr: number; // IRR on equity invested (after debt service)
+  equityInvested: number; // investment * (1 - ltv)
+  loanAmount: number;
+  annualDebtService: number;
+  debtServiceCoverageRatio: number; // stabilized NOI / debt service (should be >1.2)
 }
 
 export const SCENARIOS: ScenarioInputs[] = [
@@ -57,6 +77,11 @@ export const SCENARIOS: ScenarioInputs[] = [
     otherRevenuePct: 0.05,
     capexReservePct: 0.05,
     terminalCapRate: 0.09,
+    corporateTaxRate: 0.22,
+    propertyTaxAnnual: 15000,
+    ltvPct: 0,
+    interestRate: 0.045,
+    loanTermYears: 15,
   },
   {
     name: "Base",
@@ -70,6 +95,11 @@ export const SCENARIOS: ScenarioInputs[] = [
     otherRevenuePct: 0.1,
     capexReservePct: 0.04,
     terminalCapRate: 0.075,
+    corporateTaxRate: 0.22,
+    propertyTaxAnnual: 15000,
+    ltvPct: 0,
+    interestRate: 0.045,
+    loanTermYears: 15,
   },
   {
     name: "Optimistic",
@@ -83,6 +113,11 @@ export const SCENARIOS: ScenarioInputs[] = [
     otherRevenuePct: 0.15,
     capexReservePct: 0.03,
     terminalCapRate: 0.06,
+    corporateTaxRate: 0.22,
+    propertyTaxAnnual: 15000,
+    ltvPct: 0,
+    interestRate: 0.045,
+    loanTermYears: 15,
   },
 ];
 
@@ -110,6 +145,24 @@ export function calculateIRR(cashFlows: number[], guess = 0.1): number {
   return rate;
 }
 
+function calculatePMT(principal: number, annualRate: number, years: number): number {
+  if (principal === 0) return 0;
+  if (annualRate === 0) return principal / years;
+  const r = annualRate;
+  const n = years;
+  return principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+}
+
+function loanBalanceAfterPayments(principal: number, annualRate: number, totalYears: number, paymentsMade: number): number {
+  if (principal === 0 || paymentsMade >= totalYears) return 0;
+  if (annualRate === 0) return principal * (1 - paymentsMade / totalYears);
+  const r = annualRate;
+  const pmt = calculatePMT(principal, r, totalYears);
+  // Balance = PV of remaining payments
+  const remainingPayments = totalYears - paymentsMade;
+  return pmt * (1 - Math.pow(1 + r, -remainingPayments)) / r;
+}
+
 export function runScenario(
   inputs: ScenarioInputs,
   investment = INVESTMENT,
@@ -120,6 +173,13 @@ export function runScenario(
   const operatingDaysYear1 = Math.round(operatingDaysFull * (OPERATING_DAYS_YEAR1 / OPERATING_DAYS_FULL));
   const projections: YearProjection[] = [];
   let cumulativeNoi = 0;
+
+  // Debt calculations
+  const loanAmount = investment * inputs.ltvPct;
+  const equityInvested = investment - loanAmount;
+  const annualDebtService = calculatePMT(loanAmount, inputs.interestRate, inputs.loanTermYears);
+
+  let cumulativeLeveragedCf = 0;
 
   for (let i = 0; i < modelYears; i++) {
     const yearNum = i + 1;
@@ -157,6 +217,16 @@ export function runScenario(
 
     cumulativeNoi += noi;
 
+    // Tax calculations
+    const incomeTax = Math.max(0, noi * inputs.corporateTaxRate);
+    const propertyTax = inputs.propertyTaxAnnual;
+    const afterTaxNoi = noi - incomeTax - propertyTax;
+
+    // Debt service
+    const debtService = annualDebtService;
+    const leveragedCashFlow = afterTaxNoi - debtService;
+    cumulativeLeveragedCf += leveragedCashFlow;
+
     // FCF: year index 0 in the IRR array is -investment (handled separately)
     const fcf = noi;
 
@@ -176,6 +246,12 @@ export function runScenario(
       noi,
       cumulativeNoi,
       fcf,
+      incomeTax,
+      propertyTax,
+      afterTaxNoi,
+      debtService,
+      leveragedCashFlow,
+      cumulativeLeveragedCf,
     });
   }
 
@@ -218,6 +294,43 @@ export function runScenario(
   const yieldOnCost = investment > 0 ? stabilizedNoi / investment : 0;
   const cashOnCash = yieldOnCost; // Same when no debt financing
 
+  // After-Tax Yield on Cost
+  const stabilizedAfterTaxNoi = stabilizedYear?.afterTaxNoi ?? 0;
+  const afterTaxYieldOnCost = investment > 0 ? stabilizedAfterTaxNoi / investment : 0;
+
+  // After-Tax IRR: cash flows using afterTaxNoi
+  const afterTaxCashFlows: number[] = [-investment];
+  for (let i = 0; i < projections.length; i++) {
+    const lastYear = i === projections.length - 1;
+    // Terminal value adjusted: sale proceeds after tax on gain
+    const terminalAfterTax = lastYear ? terminalValue : 0;
+    afterTaxCashFlows.push(projections[i].afterTaxNoi + terminalAfterTax);
+  }
+  const afterTaxIrr = calculateIRR(afterTaxCashFlows);
+
+  // Leveraged IRR: cash flows using leveragedCashFlow
+  // Year 0 = -equity, terminal = terminal value - remaining loan balance + final year leveraged CF
+  const remainingBalance = loanAmount > 0
+    ? loanBalanceAfterPayments(loanAmount, inputs.interestRate, inputs.loanTermYears, modelYears)
+    : 0;
+
+  const leveragedCashFlows: number[] = [-equityInvested];
+  for (let i = 0; i < projections.length; i++) {
+    const lastYear = i === projections.length - 1;
+    if (lastYear) {
+      // Final year: leveraged CF + terminal value - remaining loan payoff
+      leveragedCashFlows.push(projections[i].afterTaxNoi - projections[i].debtService + terminalValue - remainingBalance);
+    } else {
+      leveragedCashFlows.push(projections[i].leveragedCashFlow);
+    }
+  }
+  const leveragedIrr = equityInvested > 0 ? calculateIRR(leveragedCashFlows) : afterTaxIrr;
+
+  // DSCR = stabilized NOI / annual debt service
+  const debtServiceCoverageRatio = annualDebtService > 0
+    ? stabilizedNoi / annualDebtService
+    : Infinity;
+
   return {
     inputs,
     projections,
@@ -230,6 +343,13 @@ export function runScenario(
     yieldOnCost,
     cashOnCash,
     stabilizedNoi,
+    afterTaxIrr,
+    afterTaxYieldOnCost,
+    leveragedIrr,
+    equityInvested,
+    loanAmount,
+    annualDebtService,
+    debtServiceCoverageRatio,
   };
 }
 
@@ -242,14 +362,14 @@ export function solveAdrForTargetYield(
   operatingDaysFull = OPERATING_DAYS_FULL,
   modelYears = MODEL_YEARS,
 ): number {
-  // Binary search for ADR that produces the target YoC
+  // Binary search for ADR that produces the target after-tax YoC
   let low = 50;
   let high = 600;
   for (let i = 0; i < 50; i++) {
     const mid = (low + high) / 2;
     const testInputs = { ...baseInputs, adrYear1: mid };
     const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears);
-    if (result.yieldOnCost < targetYield) {
+    if (result.afterTaxYieldOnCost < targetYield) {
       low = mid;
     } else {
       high = mid;
@@ -273,7 +393,7 @@ export function solveOccupancyForTargetYield(
     const mid = (low + high) / 2;
     const testInputs = { ...baseInputs, occupancyMature: mid, occupancyYear1: mid * 0.85 };
     const result = runScenario(testInputs, investment, rooms, operatingDaysFull, modelYears);
-    if (result.yieldOnCost < targetYield) {
+    if (result.afterTaxYieldOnCost < targetYield) {
       low = mid;
     } else {
       high = mid;

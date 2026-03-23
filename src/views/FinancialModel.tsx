@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import {
-  AreaChart,
   Area,
   BarChart,
   Bar,
@@ -11,6 +10,8 @@ import {
   ResponsiveContainer,
   Legend,
   ReferenceLine,
+  Line,
+  ComposedChart,
 } from "recharts";
 import {
   Calculator,
@@ -111,16 +112,20 @@ function TargetYieldSolver({
   );
 
   const requiredNoi = investment * target;
+  // Pre-tax equivalent: what pre-tax yield would produce this after-tax yield
+  const preTaxEquivalent = baseInputs.corporateTaxRate < 1
+    ? target / (1 - baseInputs.corporateTaxRate) + baseInputs.propertyTaxAnnual / investment
+    : target;
 
   return (
     <div className="bg-gradient-to-br from-emerald-50/50 to-amber-50/30 rounded-xl border border-emerald-200/60 p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-semibold text-stone-800">Target Yield Solver</h3>
-          <p className="text-xs text-stone-500">What does it take to hit your target return?</p>
+          <p className="text-xs text-stone-500">What does it take to hit your target after-tax return?</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-stone-600">Target Yield on Cost:</span>
+          <span className="text-sm text-stone-600">Target After-Tax Yield:</span>
           <input
             type="number"
             value={targetYield}
@@ -136,11 +141,12 @@ function TargetYieldSolver({
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg p-4 border border-stone-200/60">
-          <p className="text-xs text-stone-500 uppercase tracking-wide">Required Stabilized NOI</p>
+          <p className="text-xs text-stone-500 uppercase tracking-wide">Required After-Tax NOI</p>
           <p className="text-2xl font-bold text-stone-800 mt-1">
             €{(requiredNoi / 1000).toFixed(0)}K<span className="text-sm font-normal text-stone-400">/year</span>
           </p>
-          <p className="text-xs text-stone-400 mt-1">= {targetYield}% × €{(investment / 1_000_000).toFixed(1)}M investment</p>
+          <p className="text-xs text-stone-400 mt-1">= {targetYield}% x €{(investment / 1_000_000).toFixed(1)}M investment</p>
+          <p className="text-xs text-stone-400 mt-0.5">Pre-tax equivalent: ~{fmtPct(preTaxEquivalent)} YoC</p>
         </div>
 
         <div className="bg-white rounded-lg p-4 border border-stone-200/60">
@@ -180,6 +186,13 @@ export function FinancialModel() {
   const [operatingDays, setOperatingDays] = useState(OPERATING_DAYS_FULL);
   const [modelYears, setModelYears] = useState(MODEL_YEARS);
 
+  // Global tax & financing parameters (same across all scenarios)
+  const [corporateTaxRate, setCorporateTaxRate] = useState(0.22);
+  const [propertyTaxAnnual, setPropertyTaxAnnual] = useState(15000);
+  const [ltvPct, setLtvPct] = useState(0);
+  const [interestRate, setInterestRate] = useState(0.045);
+  const [loanTermYears, setLoanTermYears] = useState(15);
+
   // Editable scenario inputs (deep clone defaults)
   const [scenarioInputs, setScenarioInputs] = useState<ScenarioInputs[]>(
     () => SCENARIOS.map((s) => ({ ...s })),
@@ -208,15 +221,33 @@ export function FinancialModel() {
     setRooms(ROOMS);
     setOperatingDays(OPERATING_DAYS_FULL);
     setModelYears(MODEL_YEARS);
+    setCorporateTaxRate(0.22);
+    setPropertyTaxAnnual(15000);
+    setLtvPct(0);
+    setInterestRate(0.045);
+    setLoanTermYears(15);
   }, []);
 
-  // Recalculate on any change
+  // Merge global tax/debt into each scenario before running
   const results = useMemo<ScenarioResult[]>(
     () =>
       scenarioInputs.map((s) =>
-        runScenario(s, investment, rooms, operatingDays, modelYears),
+        runScenario(
+          {
+            ...s,
+            corporateTaxRate,
+            propertyTaxAnnual,
+            ltvPct,
+            interestRate,
+            loanTermYears,
+          },
+          investment,
+          rooms,
+          operatingDays,
+          modelYears,
+        ),
       ),
-    [scenarioInputs, investment, rooms, operatingDays, modelYears],
+    [scenarioInputs, investment, rooms, operatingDays, modelYears, corporateTaxRate, propertyTaxAnnual, ltvPct, interestRate, loanTermYears],
   );
 
   // Cash flow chart data
@@ -227,6 +258,9 @@ export function FinancialModel() {
       Pessimistic: results[0].projections[i].cumulativeNoi / 1_000_000,
       Base: results[1].projections[i].cumulativeNoi / 1_000_000,
       Optimistic: results[2].projections[i].cumulativeNoi / 1_000_000,
+      "Pessimistic (After-Tax)": results[0].projections[i].cumulativeLeveragedCf / 1_000_000,
+      "Base (After-Tax)": results[1].projections[i].cumulativeLeveragedCf / 1_000_000,
+      "Optimistic (After-Tax)": results[2].projections[i].cumulativeLeveragedCf / 1_000_000,
     }));
   }, [results]);
 
@@ -240,9 +274,24 @@ export function FinancialModel() {
     }));
   }, [results]);
 
+  // Build base inputs for the solver (with global tax/debt merged)
+  const baseInputsForSolver = useMemo<ScenarioInputs>(
+    () => ({
+      ...scenarioInputs[1],
+      corporateTaxRate,
+      propertyTaxAnnual,
+      ltvPct,
+      interestRate,
+      loanTermYears,
+    }),
+    [scenarioInputs, corporateTaxRate, propertyTaxAnnual, ltvPct, interestRate, loanTermYears],
+  );
+
   // Collapsed summary text (Base scenario values)
   const base = scenarioInputs[1];
   const collapsedSummary = `ADR €${base.adrYear1} | Occ ${(base.occupancyYear1 * 100).toFixed(0)}% | GOP ${(base.gopMargin * 100).toFixed(0)}% | Cap Rate ${(base.terminalCapRate * 100).toFixed(1)}% (Base)`;
+
+  const hasDebt = ltvPct > 0;
 
   return (
     <div className="space-y-8">
@@ -376,6 +425,86 @@ export function FinancialModel() {
                       }}
                       min={5}
                       max={20}
+                      step={1}
+                      className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    />
+                    <span className="text-xs text-stone-400">years</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <hr className="border-stone-100" />
+
+            {/* Global Tax & Financing Parameters */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-3">
+                Tax & Financing
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <SliderInput
+                  label="Corporate Tax Rate"
+                  value={parseFloat((corporateTaxRate * 100).toFixed(1))}
+                  onChange={(v) => setCorporateTaxRate(v / 100)}
+                  min={0}
+                  max={35}
+                  step={1}
+                  suffix="%"
+                  compact
+                />
+                <div className="space-y-1">
+                  <label className="text-xs text-stone-500">Property Tax (ENFIA)</label>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-stone-400">€</span>
+                    <input
+                      type="number"
+                      value={propertyTaxAnnual}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v))
+                          setPropertyTaxAnnual(Math.min(50000, Math.max(0, v)));
+                      }}
+                      min={0}
+                      max={50000}
+                      step={1000}
+                      className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    />
+                    <span className="text-xs text-stone-400">/yr</span>
+                  </div>
+                </div>
+                <SliderInput
+                  label="LTV (Debt %)"
+                  value={parseFloat((ltvPct * 100).toFixed(0))}
+                  onChange={(v) => setLtvPct(v / 100)}
+                  min={0}
+                  max={80}
+                  step={5}
+                  suffix="%"
+                  compact
+                />
+                <SliderInput
+                  label="Interest Rate"
+                  value={parseFloat((interestRate * 100).toFixed(2))}
+                  onChange={(v) => setInterestRate(v / 100)}
+                  min={0}
+                  max={10}
+                  step={0.25}
+                  suffix="%"
+                  compact
+                />
+                <div className="space-y-1">
+                  <label className="text-xs text-stone-500">Loan Term</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={loanTermYears}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v))
+                          setLoanTermYears(Math.min(30, Math.max(5, v)));
+                      }}
+                      min={5}
+                      max={30}
                       step={1}
                       className="w-20 px-1.5 py-0.5 font-mono text-xs text-stone-700 bg-white border border-stone-200 rounded focus:outline-none focus:ring-1 focus:ring-emerald-400"
                     />
@@ -567,6 +696,11 @@ export function FinancialModel() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {results.map((result, i) => {
           const style = SCENARIO_STYLES[i];
+          const dscrColor = result.debtServiceCoverageRatio >= 1.5
+            ? "text-emerald-600"
+            : result.debtServiceCoverageRatio >= 1.2
+              ? "text-amber-600"
+              : "text-red-600";
           return (
             <div
               key={result.inputs.name}
@@ -636,6 +770,52 @@ export function FinancialModel() {
                   </div>
                 </div>
               </div>
+
+              {/* After-Tax section */}
+              <div className="mt-3 pt-3 border-t border-stone-200/60">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-stone-400">After-Tax Yield on Cost</p>
+                    <p className={`text-lg font-bold ${result.afterTaxYieldOnCost >= 0.04 ? "text-emerald-600" : result.afterTaxYieldOnCost >= 0.025 ? "text-amber-600" : "text-red-600"}`}>
+                      {fmtPct(result.afterTaxYieldOnCost)}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-stone-400">After-Tax NOI</p>
+                    <p className="font-semibold text-stone-700 text-sm">
+                      {result.projections[2]
+                        ? `${fmtEuroK(result.projections[2].afterTaxNoi)}/yr`
+                        : "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Leveraged section (only if LTV > 0) */}
+              {hasDebt && (
+                <div className="mt-3 pt-3 border-t border-stone-200/60 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-xs text-stone-400">Leveraged IRR</p>
+                      <p className={`text-lg font-bold ${style.text}`}>
+                        {fmtPct(result.leveragedIrr)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-stone-400">DSCR</p>
+                      <p className={`text-lg font-bold ${dscrColor}`}>
+                        {result.debtServiceCoverageRatio === Infinity
+                          ? "N/A"
+                          : result.debtServiceCoverageRatio.toFixed(2) + "x"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs text-stone-500">
+                    <span>Equity: {fmtEuroM(result.equityInvested)}</span>
+                    <span>Loan: {fmtEuroM(result.loanAmount)}</span>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
@@ -643,7 +823,7 @@ export function FinancialModel() {
 
       {/* D. Target Yield Solver */}
       <TargetYieldSolver
-        baseInputs={scenarioInputs[1]}
+        baseInputs={baseInputsForSolver}
         investment={investment}
         rooms={rooms}
         operatingDays={operatingDays}
@@ -652,11 +832,14 @@ export function FinancialModel() {
 
       {/* E. Cash Flow Chart */}
       <div className="bg-white rounded-xl border border-stone-200 p-5">
-        <h3 className="text-sm font-semibold text-stone-700 mb-4">
-          Cumulative Net Operating Income
+        <h3 className="text-sm font-semibold text-stone-700 mb-1">
+          Cumulative Cash Flow
         </h3>
+        <p className="text-xs text-stone-400 mb-4">
+          Solid lines: pre-tax NOI | Dashed lines: after-tax{hasDebt ? " (less debt service)" : ""}
+        </p>
         <ResponsiveContainer width="100%" height={340}>
-          <AreaChart data={cashFlowData}>
+          <ComposedChart data={cashFlowData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
             <XAxis dataKey="year" tick={{ fontSize: 12 }} stroke="#a8a29e" />
             <YAxis
@@ -681,6 +864,7 @@ export function FinancialModel() {
                 fontSize: 11,
               }}
             />
+            {/* Pre-tax solid area lines */}
             <Area
               type="monotone"
               dataKey="Pessimistic"
@@ -705,7 +889,32 @@ export function FinancialModel() {
               fillOpacity={0.1}
               strokeWidth={2}
             />
-          </AreaChart>
+            {/* After-tax dashed lines */}
+            <Line
+              type="monotone"
+              dataKey="Pessimistic (After-Tax)"
+              stroke={SCENARIO_STYLES[0].chart}
+              strokeDasharray="6 4"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="Base (After-Tax)"
+              stroke={SCENARIO_STYLES[1].chart}
+              strokeDasharray="6 4"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="Optimistic (After-Tax)"
+              stroke={SCENARIO_STYLES[2].chart}
+              strokeDasharray="6 4"
+              strokeWidth={2}
+              dot={false}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 
@@ -778,7 +987,8 @@ export function FinancialModel() {
               )}
               {result.inputs.name} Scenario
               <span className="text-stone-400 font-normal ml-2">
-                IRR {fmtPct(result.irr)} | ROI {fmtPct(result.roi, 0)}
+                IRR {fmtPct(result.irr)} | After-Tax IRR {fmtPct(result.afterTaxIrr)}
+                {hasDebt && ` | Leveraged IRR ${fmtPct(result.leveragedIrr)}`}
               </span>
             </button>
 
@@ -818,6 +1028,22 @@ export function FinancialModel() {
                         NOI
                       </th>
                       <th className="text-right px-3 py-2 text-stone-500 font-medium">
+                        Tax
+                      </th>
+                      <th className="text-right px-3 py-2 text-stone-500 font-medium">
+                        After-Tax NOI
+                      </th>
+                      {hasDebt && (
+                        <>
+                          <th className="text-right px-3 py-2 text-stone-500 font-medium">
+                            Debt Svc
+                          </th>
+                          <th className="text-right px-3 py-2 text-stone-500 font-medium">
+                            Lev. CF
+                          </th>
+                        </>
+                      )}
+                      <th className="text-right px-3 py-2 text-stone-500 font-medium">
                         Cumulative
                       </th>
                     </tr>
@@ -855,6 +1081,22 @@ export function FinancialModel() {
                         <td className="px-3 py-2 text-right font-mono text-stone-600">
                           {fmtEuroK(p.noi)}
                         </td>
+                        <td className="px-3 py-2 text-right font-mono text-red-500">
+                          {fmtEuroK(p.incomeTax + p.propertyTax)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono font-semibold text-stone-700">
+                          {fmtEuroK(p.afterTaxNoi)}
+                        </td>
+                        {hasDebt && (
+                          <>
+                            <td className="px-3 py-2 text-right font-mono text-red-500">
+                              {fmtEuroK(p.debtService)}
+                            </td>
+                            <td className={`px-3 py-2 text-right font-mono font-semibold ${p.leveragedCashFlow >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                              {fmtEuroK(p.leveragedCashFlow)}
+                            </td>
+                          </>
+                        )}
                         <td
                           className={`px-3 py-2 text-right font-mono font-semibold ${
                             p.cumulativeNoi >= investment
@@ -922,13 +1164,21 @@ export function FinancialModel() {
             180 days is standard for seasonal Aegean island hotels. Year 1 partial (120 days) assumes
             April 2029 opening with limited pre-season bookings.
           </div>
+          <div>
+            <span className="font-medium text-stone-700">Corporate Tax (22%):</span>{" "}
+            Greek corporate income tax rate is 22% (Law 4799/2021). Applied to NOI before property tax.
+            ENFIA property tax estimated at €15K/year for a 48-room heritage hotel property in Lesvos.
+          </div>
         </div>
       </div>
 
       {/* H. Sensitivity Note */}
       <p className="text-xs text-stone-400 leading-relaxed">
-        Model assumes seasonal operation ({operatingDays} days/year), no debt
-        financing. Terminal value calculated using NOI / Cap Rate method. IRR
+        Model assumes seasonal operation ({operatingDays} days/year){hasDebt
+          ? `, ${(ltvPct * 100).toFixed(0)}% LTV at ${(interestRate * 100).toFixed(1)}% over ${loanTermYears} years`
+          : ", no debt financing"}.
+        Corporate tax rate: {(corporateTaxRate * 100).toFixed(0)}%. ENFIA: €{propertyTaxAnnual.toLocaleString()}/yr.
+        Terminal value calculated using NOI / Cap Rate method. IRR
         includes terminal value at Year {modelYears}. Investment total:{" "}
         {fmtEuroM(investment)} excl. VAT. Partial first year (2029):{" "}
         {Math.round(operatingDays * (120 / 180))} operating days.
