@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   LineChart,
   Line,
@@ -16,8 +16,16 @@ import {
   CheckCircle,
   XCircle,
   Info,
+  ShieldCheck,
 } from "lucide-react";
 import { useMarketData, type MarketDataPoint } from "../hooks/useMarketData";
+import { useBudgetLines } from "../hooks/useBudget";
+import {
+  validateBudgetLines,
+  scenarioImpact,
+  quartersForMidpoint,
+  type IndexType,
+} from "../lib/budget-validator";
 
 // ---------- ANICON Budget Constants ----------
 
@@ -231,8 +239,50 @@ function buildProjectionData(
 
 // ---------- Main Component ----------
 
+const INDEX_LABELS: Record<IndexType, string> = {
+  construction: "Construction",
+  material: "Material",
+  cpi: "CPI",
+  blend: "Blend",
+};
+
+const MIDPOINT_OPTIONS = ["2026-Q4", "2027-Q1", "2027-Q2", "2027-Q3", "2027-Q4"];
+
+function fmtK(n: number): string {
+  if (Math.abs(n) >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  return `${(n / 1_000).toFixed(0)}K`;
+}
+
+function fmtPct(n: number): string {
+  return `${(n * 100).toFixed(1)}%`;
+}
+
+function riskDotColor(risk: "low" | "medium" | "high"): string {
+  switch (risk) {
+    case "low":
+      return "bg-emerald-500";
+    case "medium":
+      return "bg-amber-500";
+    case "high":
+      return "bg-red-500";
+  }
+}
+
+function riskRowBg(risk: "low" | "medium" | "high"): string {
+  switch (risk) {
+    case "low":
+      return "bg-emerald-50/40";
+    case "medium":
+      return "bg-amber-50/40";
+    case "high":
+      return "bg-red-50/40";
+  }
+}
+
 export function MarketCheck() {
   const { data, isLoading, error } = useMarketData();
+  const { data: budgetLines } = useBudgetLines();
+  const [midpoint, setMidpoint] = useState("2027-Q2");
 
   const analysis = useMemo(() => {
     if (!data) return null;
@@ -315,6 +365,37 @@ export function MarketCheck() {
       ANICON.inflationAssumption,
     );
   }, [data]);
+
+  // Budget validation
+  const validatedLines = useMemo(() => {
+    if (!data || !budgetLines) return null;
+    return validateBudgetLines(
+      budgetLines,
+      data.constructionCostIndex,
+      data.materialPriceIndex,
+      data.cpiGreece,
+      midpoint,
+    );
+  }, [data, budgetLines, midpoint]);
+
+  const budgetSummary = useMemo(() => {
+    if (!validatedLines || validatedLines.length === 0) return null;
+    const totalAnicon = validatedLines.reduce((s, v) => s + v.line.anicon_revised, 0);
+    const totalAdjusted = validatedLines.reduce((s, v) => s + v.adjustedEstimate, 0);
+    const totalDelta = totalAdjusted - totalAnicon;
+    const deltaPct = totalAnicon > 0 ? totalDelta / totalAnicon : 0;
+    return { totalAnicon, totalAdjusted, totalDelta, deltaPct };
+  }, [validatedLines]);
+
+  const scenarios = useMemo(() => {
+    if (!budgetLines) return null;
+    const qtrs = quartersForMidpoint(midpoint);
+    return [
+      { rate: 0.02, label: "2% annual", isAnicon: false, ...scenarioImpact(budgetLines, 0.02, qtrs) },
+      { rate: 0.04, label: "4% annual", isAnicon: true, ...scenarioImpact(budgetLines, 0.04, qtrs) },
+      { rate: 0.06, label: "6% annual", isAnicon: false, ...scenarioImpact(budgetLines, 0.06, qtrs) },
+    ];
+  }, [budgetLines, midpoint]);
 
   // ---------- Render ----------
 
@@ -623,6 +704,209 @@ export function MarketCheck() {
           </div>
         </div>
       </Card>
+
+      {/* ===== Budget Line Validation ===== */}
+      {validatedLines && budgetSummary && (
+        <>
+          {/* Section Header */}
+          <div className="pt-4 border-t border-stone-200">
+            <h2 className="text-2xl font-bold text-stone-800 flex items-center gap-2">
+              <ShieldCheck size={24} className="text-emerald-600" />
+              Budget Line Validation
+            </h2>
+            <p className="text-sm text-stone-500 mt-1">
+              Each budget line mapped to a relevant price index and time-adjusted to construction midpoint
+            </p>
+          </div>
+
+          {/* Summary Bar */}
+          <div
+            className={`rounded-xl border p-5 ${
+              Math.abs(budgetSummary.deltaPct) > 0.05
+                ? "border-red-200 bg-red-50/60"
+                : Math.abs(budgetSummary.deltaPct) > 0.02
+                  ? "border-amber-200 bg-amber-50/60"
+                  : "border-emerald-200 bg-emerald-50/60"
+            }`}
+          >
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">ANICON Budget</p>
+                <p className="text-xl font-bold text-stone-800 mt-1">
+                  &euro;{fmtK(budgetSummary.totalAnicon)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">Time-Adjusted Total</p>
+                <p className="text-xl font-bold text-stone-800 mt-1">
+                  &euro;{fmtK(budgetSummary.totalAdjusted)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">Total Exposure</p>
+                <p className="text-xl font-bold text-stone-800 mt-1">
+                  +&euro;{fmtK(budgetSummary.totalDelta)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-stone-400 uppercase tracking-wider">Exposure %</p>
+                <p
+                  className={`text-xl font-bold mt-1 ${
+                    Math.abs(budgetSummary.deltaPct) > 0.05
+                      ? "text-red-700"
+                      : Math.abs(budgetSummary.deltaPct) > 0.02
+                        ? "text-amber-700"
+                        : "text-emerald-700"
+                  }`}
+                >
+                  +{fmtPct(budgetSummary.deltaPct)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Construction Midpoint Selector */}
+          <div className="flex items-center gap-3">
+            <label className="text-sm font-medium text-stone-600">
+              Construction spending midpoint:
+            </label>
+            <select
+              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+              value={midpoint}
+              onChange={(e) => setMidpoint(e.target.value)}
+            >
+              {MIDPOINT_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                  {opt === "2027-Q2" ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Risk Heatmap Table */}
+          <Card>
+            <CardTitle>Risk Heatmap</CardTitle>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-stone-200 text-left">
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                      Budget Line
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      ANICON Est.
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider">
+                      Index
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      YoY Growth
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      Adjusted Est.
+                    </th>
+                    <th className="py-2 pr-3 text-xs font-semibold text-stone-500 uppercase tracking-wider text-right">
+                      Delta
+                    </th>
+                    <th className="py-2 text-xs font-semibold text-stone-500 uppercase tracking-wider text-center">
+                      Risk
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {validatedLines.map((v) => (
+                    <tr
+                      key={v.line.id}
+                      className={`border-b border-stone-100 ${riskRowBg(v.risk)}`}
+                      title={v.rationale}
+                    >
+                      <td className="py-2 pr-3">
+                        <div className="font-medium text-stone-700 truncate max-w-[220px]">
+                          {v.line.description}
+                        </div>
+                        <div className="text-[10px] text-stone-400">{v.rationale}</div>
+                      </td>
+                      <td className="py-2 pr-3 text-right text-stone-700 tabular-nums">
+                        &euro;{fmtK(v.line.anicon_revised)}
+                      </td>
+                      <td className="py-2 pr-3 text-stone-600">{INDEX_LABELS[v.indexType]}</td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                        {v.currentIndexGrowthYoy != null ? fmtPct(v.currentIndexGrowthYoy) : "4.0%*"}
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                        &euro;{fmtK(v.adjustedEstimate)}
+                      </td>
+                      <td className="py-2 pr-3 text-right tabular-nums text-stone-700">
+                        +&euro;{fmtK(v.delta)} ({fmtPct(v.deltaPct)})
+                      </td>
+                      <td className="py-2 text-center">
+                        <span
+                          className={`inline-block w-3 h-3 rounded-full ${riskDotColor(v.risk)}`}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-stone-400 mt-3">
+              * Lines marked 4.0%* use ANICON&apos;s default assumption (actual index data unavailable)
+            </p>
+          </Card>
+
+          {/* Inflation Scenario Cards */}
+          {scenarios && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {scenarios.map((s) => (
+                <Card
+                  key={s.label}
+                  className={
+                    s.isAnicon
+                      ? "ring-2 ring-emerald-500/40 border-emerald-300"
+                      : ""
+                  }
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <CardTitle>If {s.label}</CardTitle>
+                    {s.isAnicon && (
+                      <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full uppercase">
+                        ANICON assumption
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-stone-500">Adjusted total</span>
+                      <span className="font-bold text-stone-800">&euro;{fmtK(s.totalAdjusted)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-stone-500">Delta from budget</span>
+                      <span className="font-semibold text-stone-700">
+                        +&euro;{fmtK(s.totalDelta)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-stone-500">Increase</span>
+                      <span
+                        className={`font-semibold ${
+                          s.rate > 0.05
+                            ? "text-red-700"
+                            : s.rate > 0.03
+                              ? "text-amber-700"
+                              : "text-emerald-700"
+                        }`}
+                      >
+                        +{fmtPct(s.totalOriginal > 0 ? s.totalDelta / s.totalOriginal : 0)}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Footer */}
       <p className="text-[11px] text-stone-400 text-center">
