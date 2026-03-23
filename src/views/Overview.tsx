@@ -95,13 +95,13 @@ export function Overview() {
       {/* Hotel Photo Strip */}
       <div className="grid grid-cols-3 gap-3 -mt-2">
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/molyvos-castle.jpg" alt="Molyvos village with castle" className="w-full h-full object-cover object-center" />
+          <img src="/hotel-pool.jpg" alt="Pool with Molyvos castle view" className="w-full h-full object-cover object-center" />
         </div>
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/olive-tree.jpg" alt="Olive grove" className="w-full h-full object-cover object-center" />
+          <img src="/hotel-view.jpg" alt="Hotel from the sea" className="w-full h-full object-cover object-center" />
         </div>
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/heritage-stork-emblem.jpg" alt="Heritage stork emblem" className="w-full h-full object-cover object-center" />
+          <img src="/hotel-exterior.jpg" alt="Hotel stone exterior" className="w-full h-full object-cover object-center" />
         </div>
       </div>
 

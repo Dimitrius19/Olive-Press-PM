@@ -197,7 +197,7 @@ export function Documents() {
         {filtered.length === 0 && (
           <div className="relative py-16 flex flex-col items-center justify-center overflow-hidden">
             <img
-              src="/olive-tree.jpg"
+              src="/hotel-view.jpg"
               alt=""
               className="absolute inset-0 w-full h-full object-cover object-center opacity-[0.07]"
             />
