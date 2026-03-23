@@ -199,7 +199,7 @@ export function Documents() {
             <img
               src="/olive-tree.jpg"
               alt=""
-              className="absolute inset-0 w-full h-full object-cover opacity-[0.07]"
+              className="absolute inset-0 w-full h-full object-cover object-center opacity-[0.07]"
             />
             <p className="relative text-stone-500 text-sm font-medium">
               Upload project documents to get started

@@ -103,9 +103,9 @@ export function Gallery() {
       {filtered.length === 0 ? (
         <div className="relative rounded-2xl overflow-hidden py-20 flex flex-col items-center justify-center">
           <img
-            src="/hotel-pool.jpg"
+            src="/aegean-coast.jpg"
             alt=""
-            className="absolute inset-0 w-full h-full object-cover opacity-10"
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-10"
           />
           <p className="relative text-stone-500 text-sm font-medium">
             Capture the renovation journey — upload site photos

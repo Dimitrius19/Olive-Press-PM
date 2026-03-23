@@ -71,7 +71,7 @@ export function Overview() {
         <img
           src="/hotel-aerial.jpg"
           alt="Olive Press Hotel — Aerial view, Molyvos, Lesvos"
-          className="w-full h-56 object-cover"
+          className="w-full h-56 object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
         <div className="absolute bottom-0 left-0 p-8">
@@ -95,13 +95,22 @@ export function Overview() {
       {/* Hotel Photo Strip */}
       <div className="grid grid-cols-3 gap-3 -mt-2">
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-pool.jpg" alt="Pool & Castle view" className="w-full h-full object-cover" />
+          <img src="/molyvos-castle.jpg" alt="Molyvos village with castle" className="w-full h-full object-cover object-center" />
         </div>
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-view.jpg" alt="Hotel from sea" className="w-full h-full object-cover" />
+          <img src="/olive-tree.jpg" alt="Olive grove" className="w-full h-full object-cover object-center" />
         </div>
         <div className="rounded-xl overflow-hidden h-28">
-          <img src="/hotel-exterior.jpg" alt="Hotel exterior" className="w-full h-full object-cover" />
+          <img src="/heritage-stork-emblem.jpg" alt="Heritage stork emblem" className="w-full h-full object-cover object-center" />
+        </div>
+      </div>
+
+      {/* Heritage Identity */}
+      <div className="bg-white rounded-xl border border-stone-200 p-4 flex items-center gap-4">
+        <img src="/heritage-stork-emblem.jpg" alt="Olive Press Heritage — ΣΗΜΑ ΚΑΤΑΤΕΘΕΝ" className="w-20 h-20 rounded-full object-cover object-center border-2 border-amber-200" />
+        <div>
+          <p className="font-semibold text-stone-800">Heritage Emblem — ΣΗΜΑ ΚΑΤΑΤΕΘΕΝ</p>
+          <p className="text-xs text-stone-500 mt-1">19th century olive press trademark, preserved on the original stone masonry. Part of the building's cultural heritage designation.</p>
         </div>
       </div>
 
