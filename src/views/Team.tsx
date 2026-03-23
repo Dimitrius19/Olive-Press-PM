@@ -13,6 +13,10 @@ interface EditFields {
   phone: string;
 }
 
+const TEAM_PHOTOS: Record<string, string> = {
+  "Evangelos Alatzas": "/team-alatzas.jpg",
+};
+
 export function Team() {
   const { data: members, isLoading, error } = useTeam();
   const createMember = useCreateTeamMember();
@@ -230,6 +234,13 @@ export function Team() {
                   </div>
                 ) : (
                   <>
+                    {TEAM_PHOTOS[m.name] && (
+                      <img
+                        src={TEAM_PHOTOS[m.name]}
+                        alt={m.name}
+                        className="w-16 h-16 rounded-full object-cover mb-3 border-2 border-stone-200"
+                      />
+                    )}
                     <p className="font-semibold text-stone-800">{m.name}</p>
                     <p className="text-sm text-stone-500">{m.role}</p>
                     <div className="mt-3 space-y-1 text-xs text-stone-400">
