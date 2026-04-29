@@ -13,6 +13,7 @@ import { Gallery } from "./views/Gallery";
 import { MarketCheck } from "./views/MarketCheck";
 import { FinancialModel } from "./views/FinancialModel";
 import { SitePlan } from "./views/SitePlan";
+import { StrategyOptimizer } from "./views/StrategyOptimizer";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -37,6 +38,7 @@ const viewComponents: Record<ViewName, ComponentType> = {
   siteplan: SitePlan,
   market: MarketCheck,
   financial: FinancialModel,
+  optimizer: StrategyOptimizer,
 };
 
 function App() {
