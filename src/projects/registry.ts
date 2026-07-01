@@ -12,9 +12,16 @@ import {
   Building2,
   HardHat,
 } from "lucide-react";
-import type { ProjectDef, ProjectEconomics } from "./types";
+import type { ProjectDef, ProjectEconomics, ProjectScore } from "./types";
 import { CapexProvider } from "../lib/capex-context";
-import { fmtMoney, fmtPct } from "./cases/model";
+import {
+  fmtMoney,
+  fmtPct,
+  scoreIrr,
+  scoreRisk,
+  composeGrade,
+  type RiskLike,
+} from "./cases/model";
 import {
   runScenario,
   SCENARIOS,
@@ -46,7 +53,7 @@ import { FinancialModel } from "../views/FinancialModel";
 import { BuildSell } from "../views/BuildSell";
 import { ConstructionCapex } from "../views/ConstructionCapex";
 import { EllinikonMarketCheck } from "../views/EllinikonMarketCheck";
-import { EllinikonRisks } from "../views/EllinikonRisks";
+import { EllinikonRisks, RISKS as ELLINIKON_RISKS } from "../views/EllinikonRisks";
 
 // Mani estate (self-contained project package)
 import { maniProject } from "./mani";
@@ -73,12 +80,44 @@ const olivePressEconomics: ProjectEconomics = {
   irr: fmtPct(olivePressBase.netIrr),
 };
 
+// Risk-adjusted grade for the hub card, on the same 0–100 scorecard as the
+// opportunity cases (IRR 50% / development 30% / operational 20%). Two caveats
+// are specific to this asset:
+//  · the scorecard's IRR axis is calibrated for levered *development* equity IRRs
+//    (6% → 0, 30% → 100); Olive Press headlines a stabilised, post-subsidy *net*
+//    yield (~6.5%), which sits on the band floor and caps the composite whatever
+//    the risk axes say.
+//  · the live risk register is Supabase-backed and not available at build time, so
+//    the development-risk axis is a hand-set assessment, not a computed penalty.
+const olivePressScore: ProjectScore = (() => {
+  const irrScore = scoreIrr(olivePressBase.netIrr);
+  const devRisk = 55; // active build, historic conversion; permits + €3M subsidy secured
+  const opRisk = 45; // 48-key operating hotel — seasonal, staff- and F&B-intensive
+  const { composite, grade, verdict } = composeGrade(irrScore, devRisk, opRisk);
+  return { composite: Math.round(composite), grade, verdict };
+})();
+
 // Ellinikon Villa: the "Sell at Completion" base case of the build-sell model.
 const ellinikonBase = runBuildSellScenario(BUILD_SELL_DEFAULTS, BUILD_SELL_SCENARIOS[0]);
 const ellinikonEconomics: ProjectEconomics = {
   totalCost: fmtMoney(ellinikonBase.totalProjectCost),
   irr: fmtPct(ellinikonBase.annualisedIrr),
 };
+
+// Risk-adjusted grade for the hub card, on the same scorecard as the cases.
+// Development risk is scored from the real, rated Ellinikon register; operational
+// risk is low because a merchant build-and-sell leaves no asset to run. Note the
+// IRR axis reads this project's *annualised* short-hold sale IRR — a different
+// convention from the cases' multi-year levered equity IRR — so it pins to 100
+// and effectively carries the grade.
+const ellinikonRegister: RiskLike[] = ELLINIKON_RISKS;
+const ellinikonScore: ProjectScore = (() => {
+  const irrScore = scoreIrr(ellinikonBase.annualisedIrr);
+  const riskScore = scoreRisk(ellinikonRegister);
+  const opRisk = 82; // build-to-sell: no operating business retained after the sale
+  const { composite, grade, verdict } = composeGrade(irrScore, riskScore, opRisk);
+  return { composite: Math.round(composite), grade, verdict };
+})();
 
 const olivePress: ProjectDef = {
   id: "olive-press",
@@ -100,6 +139,7 @@ const olivePress: ProjectDef = {
     { label: "State subsidy", value: "€3.0M" },
   ],
   economics: olivePressEconomics,
+  score: olivePressScore,
   nav: [
     { key: "overview", label: "Overview", icon: LayoutDashboard, component: Overview },
     { key: "timeline", label: "Timeline", icon: GanttChart, component: Timeline },
@@ -133,6 +173,7 @@ const ellinikon: ProjectDef = {
     { label: "Strategy", value: "Build & sell" },
   ],
   economics: ellinikonEconomics,
+  score: ellinikonScore,
   nav: [
     { key: "buildsell", label: "Build-Sell Model", icon: Building2, component: BuildSell },
     { key: "capex", label: "Construction CAPEX", icon: HardHat, component: ConstructionCapex },

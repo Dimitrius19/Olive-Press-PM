@@ -15,7 +15,7 @@ interface RiskItem {
   mitigation: string;
 }
 
-const RISKS: RiskItem[] = [
+export const RISKS: RiskItem[] = [
   {
     title: "Sale-price compression",
     category: "Market / Sales",

@@ -340,35 +340,41 @@ export function computeModel(a: ModelAssumptions): ModelResult {
 
 // ── Scoring ──────────────────────────────────────────────────────────────────
 
+// The minimal risk shape the register score needs. CaseRisk satisfies it, as do
+// the flagship registers (same severity/status scale), so one scoring path can
+// grade any project.
+export type RiskLike = {
+  severity: "high" | "medium" | "low";
+  status: "open" | "mitigating" | "resolved";
+};
+
 // Map the levered (equity) IRR onto 0–100: 6% → 0, 30% → 100, linear between.
-function scoreIrr(eqIrr: number): number {
+export function scoreIrr(eqIrr: number): number {
   if (!isFinite(eqIrr)) return 0;
   return clamp(((eqIrr - 0.06) / (0.3 - 0.06)) * 100, 0, 100);
 }
 
-// Derive a risk score from the case's risk register: heavier, unmitigated risks
+// Derive a risk score from a project's risk register: heavier, unmitigated risks
 // pull the score down.
-function scoreRisk(risks: CaseRisk[]): number {
-  const base: Record<CaseRisk["severity"], number> = { high: 26, medium: 13, low: 5 };
-  const factor: Record<CaseRisk["status"], number> = { open: 1, mitigating: 0.55, resolved: 0.2 };
+export function scoreRisk(risks: RiskLike[]): number {
+  const base: Record<RiskLike["severity"], number> = { high: 26, medium: 13, low: 5 };
+  const factor: Record<RiskLike["status"], number> = { open: 1, mitigating: 0.55, resolved: 0.2 };
   let penalty = 0;
   for (const r of risks) penalty += base[r.severity] * factor[r.status];
   return clamp(100 - penalty, 0, 100);
 }
 
-export function scoreCase(
-  model: ModelResult,
-  risks: CaseRisk[],
-  op: OperationalRisk,
-): Scorecard {
-  const irrScore = scoreIrr(model.equityIrr);
-  const riskScore = scoreRisk(risks);
-  const opScore = clamp(op.score, 0, 100);
+export interface GradeResult {
+  composite: number; // 0–100
+  grade: string; // A / B / C / D
+  verdict: string;
+}
+
+// Blend the three axis scores — IRR 50%, development risk 30%, operational 20%
+// — into a composite, an A–D grade and a one-line verdict. Shared by the case
+// scorecard and the flagship hub grades so the scale means the same everywhere.
+export function composeGrade(irrScore: number, riskScore: number, opScore: number): GradeResult {
   const composite = 0.5 * irrScore + 0.3 * riskScore + 0.2 * opScore;
-
-  const highs = risks.filter((r) => r.severity === "high").length;
-  const openRisks = risks.filter((r) => r.status === "open").length;
-
   const grade =
     composite >= 78 ? "A" : composite >= 64 ? "B" : composite >= 50 ? "C" : "D";
   const verdict =
@@ -379,6 +385,21 @@ export function scoreCase(
       : composite >= 50
       ? "Workable, but return leans on the assumptions"
       : "Marginal — the return does not yet clear the risk";
+  return { composite, grade, verdict };
+}
+
+export function scoreCase(
+  model: ModelResult,
+  risks: CaseRisk[],
+  op: OperationalRisk,
+): Scorecard {
+  const irrScore = scoreIrr(model.equityIrr);
+  const riskScore = scoreRisk(risks);
+  const opScore = clamp(op.score, 0, 100);
+  const { composite, grade, verdict } = composeGrade(irrScore, riskScore, opScore);
+
+  const highs = risks.filter((r) => r.severity === "high").length;
+  const openRisks = risks.filter((r) => r.status === "open").length;
 
   return {
     irr: {
