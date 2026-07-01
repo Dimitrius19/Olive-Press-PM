@@ -727,6 +727,10 @@ export function FinancialModel() {
                         suffix="%"
                         compact
                       />
+                      <p className="text-[10px] text-stone-400 leading-snug">
+                        GOP Margin sets Year 1; OpEx Growth then drives it each
+                        year, so the margin drifts as costs and ADR grow apart.
+                      </p>
                     </div>
 
                     {/* Exit inputs */}

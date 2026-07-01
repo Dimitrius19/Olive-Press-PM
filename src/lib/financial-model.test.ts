@@ -147,3 +147,34 @@ describe("runScenario — disposition (selling) costs", () => {
     expect(heavyCosts.terminalGainsTax).toBeLessThan(frictionless.terminalGainsTax);
   });
 });
+
+describe("runScenario — operating-cost growth (margin drift)", () => {
+  const margin = (r: ReturnType<typeof run>, y: number) =>
+    r.projections[y].gop / r.projections[y].totalRevenue;
+  const last = MODEL_YEARS - 1;
+
+  it("anchors the Year-1 GOP margin to the gopMargin input", () => {
+    const r = run(BASE);
+    expect(margin(r, 0)).toBeCloseTo(BASE.gopMargin, 6);
+  });
+
+  it("compresses the margin over the hold when opex outpaces ADR (Pessimistic)", () => {
+    const r = run(PESSIMISTIC); // adrGrowth 2% < opexGrowth 3%
+    expect(margin(r, last)).toBeLessThan(margin(r, 0));
+    expect(margin(r, last)).toBeLessThan(PESSIMISTIC.gopMargin);
+  });
+
+  it("expands the margin over the hold when ADR outpaces opex (Optimistic)", () => {
+    const r = run(OPTIMISTIC); // adrGrowth 5% > opexGrowth 2%
+    expect(margin(r, last)).toBeGreaterThan(margin(r, 0));
+  });
+
+  it("opexGrowth bites: faster cost inflation lowers late-year NOI and the after-tax IRR", () => {
+    const slow = run(BASE);
+    const fast = run({ ...BASE, opexGrowth: BASE.opexGrowth + 0.03 });
+    // Year 1 is the anchor (unchanged); divergence shows up by the final year.
+    expect(fast.projections[0].noi).toBeCloseTo(slow.projections[0].noi, 6);
+    expect(fast.projections[last].noi).toBeLessThan(slow.projections[last].noi);
+    expect(fast.afterTaxIrr).toBeLessThan(slow.afterTaxIrr);
+  });
+});

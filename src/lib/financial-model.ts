@@ -212,6 +212,20 @@ export function runScenario(
   const annualDepreciation = depreciableBase / buildingUsefulLifeYears;
   const sellingCostPct = inputs.sellingCostPct ?? 0.03;
 
+  // Operating-cost anchor. The gopMargin input fixes the Year-1 margin; from it
+  // we back out the Year-1 operating cost per occupied night. Costs then inflate
+  // at opexGrowth each year while revenue per night rides adrGrowth, so the GOP
+  // margin is no longer pinned -- it compresses when opex outpaces ADR (the
+  // pessimistic case) and expands when ADR outpaces opex (the optimistic case).
+  // Opex scales with occupied nights (a volume driver), not with the room rate,
+  // since charging more per room does not raise the cost of cleaning it.
+  const year1OccupiedNights = Math.round(rooms * operatingDaysYear1 * inputs.occupancyYear1);
+  const year1RoomRevenue = year1OccupiedNights * inputs.adrYear1;
+  const year1FbRevenue = year1OccupiedNights * inputs.fbPerNight;
+  const year1TotalRevenue = year1RoomRevenue + year1FbRevenue + year1RoomRevenue * inputs.otherRevenuePct;
+  const opexPerOccupiedNight =
+    year1OccupiedNights > 0 ? (year1TotalRevenue * (1 - inputs.gopMargin)) / year1OccupiedNights : 0;
+
   let cumulativeLeveragedCf = 0;
 
   for (let i = 0; i < modelYears; i++) {
@@ -244,7 +258,11 @@ export function runScenario(
 
     const revpar = roomRevenue / availableNights;
 
-    const gop = totalRevenue * inputs.gopMargin;
+    // Operating costs scale with volume (occupied nights) and inflate at
+    // opexGrowth off the Year-1 anchor. GOP is revenue less those costs, so its
+    // margin drifts with the ADR-vs-opex growth gap instead of staying fixed.
+    const opex = occupiedNights * opexPerOccupiedNight * Math.pow(1 + inputs.opexGrowth, i);
+    const gop = totalRevenue - opex;
     const capexReserve = totalRevenue * inputs.capexReservePct;
     const noi = gop - capexReserve;
 
