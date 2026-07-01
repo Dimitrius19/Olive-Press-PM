@@ -1,18 +1,9 @@
-import { useState, useCallback, type ComponentType } from "react";
+import { useState, useCallback } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PasswordGate } from "./components/PasswordGate";
-import { Layout } from "./components/Layout";
-import type { ViewName } from "./components/Sidebar";
-import { Overview } from "./views/Overview";
-import { Timeline } from "./views/Timeline";
-import { Budget } from "./views/Budget";
-import { Documents } from "./views/Documents";
-import { Risks } from "./views/Risks";
-import { Team } from "./views/Team";
-import { Gallery } from "./views/Gallery";
-import { MarketCheck } from "./views/MarketCheck";
-import { FinancialModel } from "./views/FinancialModel";
-import { SitePlan } from "./views/SitePlan";
+import { PortfolioLanding } from "./components/PortfolioLanding";
+import { ProjectWorkspace } from "./components/ProjectWorkspace";
+import { getProject } from "./projects/registry";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,25 +17,12 @@ const queryClient = new QueryClient({
 const SESSION_KEY = "olive-press-authenticated";
 const APP_PASSWORD = "olive-press-2026";
 
-const viewComponents: Record<ViewName, ComponentType> = {
-  overview: Overview,
-  timeline: Timeline,
-  budget: Budget,
-  documents: Documents,
-  risks: Risks,
-  team: Team,
-  gallery: Gallery,
-  siteplan: SitePlan,
-  market: MarketCheck,
-  financial: FinancialModel,
-};
-
 function App() {
   const [authenticated, setAuthenticated] = useState(
     () => sessionStorage.getItem(SESSION_KEY) === "true",
   );
   const [authError, setAuthError] = useState<string>();
-  const [activeView, setActiveView] = useState<ViewName>("overview");
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
   const handleAuthenticate = useCallback((password: string) => {
     if (password === APP_PASSWORD) {
@@ -60,13 +38,19 @@ function App() {
     return <PasswordGate onAuthenticated={handleAuthenticate} error={authError} />;
   }
 
-  const ActiveComponent = viewComponents[activeView];
+  const project = activeProjectId ? getProject(activeProjectId) : undefined;
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Layout activeView={activeView} onNavigate={setActiveView}>
-        <ActiveComponent />
-      </Layout>
+      {project ? (
+        <ProjectWorkspace
+          key={project.id}
+          project={project}
+          onBackToPortfolio={() => setActiveProjectId(null)}
+        />
+      ) : (
+        <PortfolioLanding onOpenProject={setActiveProjectId} />
+      )}
     </QueryClientProvider>
   );
 }
