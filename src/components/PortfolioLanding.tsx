@@ -24,6 +24,19 @@ const ACCENT_CTA: Record<AccentKey, string> = {
   indigo: "text-indigo-700",
 };
 
+// Tinted background + border for the headline-economics band. Full literal
+// strings so the Tailwind JIT scanner keeps every class.
+const ACCENT_SOFT: Record<AccentKey, string> = {
+  emerald: "bg-emerald-50/70 border-emerald-100",
+  sky: "bg-sky-50/70 border-sky-100",
+  amber: "bg-amber-50/70 border-amber-100",
+  orange: "bg-orange-50/70 border-orange-100",
+  violet: "bg-violet-50/70 border-violet-100",
+  rose: "bg-rose-50/70 border-rose-100",
+  teal: "bg-teal-50/70 border-teal-100",
+  indigo: "bg-indigo-50/70 border-indigo-100",
+};
+
 interface Props {
   onOpenProject: (id: string) => void;
 }
@@ -98,6 +111,29 @@ export function PortfolioLanding({ onOpenProject }: Props) {
 
               <div className="p-5">
                 <p className="text-sm text-stone-500 leading-relaxed min-h-[40px]">{p.tagline}</p>
+
+                {p.economics && (
+                  <div className={`mt-4 flex rounded-xl border ${ACCENT_SOFT[p.accent]}`}>
+                    <div className="flex-1 px-4 py-3">
+                      <span className="block text-[10px] uppercase tracking-widest text-stone-400 font-semibold">
+                        Total project cost
+                      </span>
+                      <span className="block text-lg font-bold text-stone-800 tabular-nums mt-0.5">
+                        {p.economics.totalCost}
+                      </span>
+                    </div>
+                    <div className="flex-1 px-4 py-3 border-l border-stone-200/70">
+                      <span className="block text-[10px] uppercase tracking-widest text-stone-400 font-semibold">
+                        IRR
+                      </span>
+                      <span
+                        className={`block text-lg font-bold tabular-nums mt-0.5 ${ACCENT_CTA[p.accent]}`}
+                      >
+                        {p.economics.irr}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-stone-100">
                   {p.kpis.slice(0, 4).map((k) => (

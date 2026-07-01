@@ -25,6 +25,14 @@ export interface ProjectKpi {
   value: string;
 }
 
+// Headline economics surfaced on the portfolio hub card. Pre-formatted strings
+// so each project can source them from its own model (the case engine, the hotel
+// scenario model, or the build-sell model) without the card knowing the details.
+export interface ProjectEconomics {
+  totalCost: string; // all-in project cost, e.g. "€45.20M"
+  irr: string; // headline IRR, e.g. "17.1%"
+}
+
 // A project is a self-contained workspace: its own brand, theme, headline KPIs
 // for the portfolio card, navigation set, and an optional state Wrapper (e.g.
 // the CAPEX provider that links the Ellinikon Villa build-up to its cost plan).
@@ -41,6 +49,7 @@ export interface ProjectDef {
   cover: string; // image path in /public
   logo?: string;
   kpis: ProjectKpi[];
+  economics?: ProjectEconomics; // headline total cost + IRR for the hub card
   nav: ProjectNavItem[];
   Wrapper?: ComponentType<{ children: ReactNode }>;
 }

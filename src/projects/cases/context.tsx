@@ -6,8 +6,9 @@ import {
   Coins,
   ShieldAlert,
 } from "lucide-react";
-import type { AccentKey, ProjectDef } from "../types";
+import type { AccentKey, ProjectDef, ProjectEconomics } from "../types";
 import type { CaseData } from "./types";
+import { computeModel, fmtMoney, fmtPct } from "./model";
 import { CaseOverview } from "./views/CaseOverview";
 import { CaseProperty } from "./views/CaseProperty";
 import { CaseAnalysis } from "./views/CaseAnalysis";
@@ -135,6 +136,14 @@ export function makeCaseProject(data: CaseData): ProjectDef {
   );
   Wrapper.displayName = `CaseProvider(${data.id})`;
 
+  // Derive the hub-card headline economics from the case's financial model:
+  // the all-in project cost and the levered (equity) IRR.
+  let economics: ProjectEconomics | undefined;
+  if (data.model) {
+    const r = computeModel(data.model);
+    economics = { totalCost: fmtMoney(r.totalCost), irr: fmtPct(r.equityIrr) };
+  }
+
   return {
     id: data.id,
     name: data.name,
@@ -147,6 +156,7 @@ export function makeCaseProject(data: CaseData): ProjectDef {
     sidebarBg: data.sidebarBg,
     cover: data.cover,
     kpis: data.kpis,
+    economics,
     nav: [
       { key: "overview", label: "Overview", icon: LayoutDashboard, component: CaseOverview },
       { key: "property", label: "Property & Location", icon: MapPin, component: CaseProperty },

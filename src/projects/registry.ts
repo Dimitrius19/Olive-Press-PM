@@ -12,8 +12,23 @@ import {
   Building2,
   HardHat,
 } from "lucide-react";
-import type { ProjectDef } from "./types";
+import type { ProjectDef, ProjectEconomics } from "./types";
 import { CapexProvider } from "../lib/capex-context";
+import { fmtMoney, fmtPct } from "./cases/model";
+import {
+  runScenario,
+  SCENARIOS,
+  INVESTMENT,
+  ROOMS,
+  OPERATING_DAYS_FULL,
+  MODEL_YEARS,
+  STATE_SUBSIDY_DEFAULT,
+} from "../lib/financial-model";
+import {
+  runBuildSellScenario,
+  BUILD_SELL_DEFAULTS,
+  BUILD_SELL_SCENARIOS,
+} from "../lib/build-sell-model";
 
 // Olive Press views (Supabase-backed PM workspace)
 import { Overview } from "../views/Overview";
@@ -39,6 +54,32 @@ import { maniProject } from "./mani";
 // Acquisition opportunity cases (data-driven shared framework)
 import { caseProjects } from "./cases";
 
+// ── Headline economics for the two flagship projects ──
+// Each is derived from that project's own base-case model so the hub card shows
+// a real total cost + IRR, consistent with the opportunity cases.
+
+// Olive Press: the base scenario of the hotel model. Total cost is the all-in
+// investment; IRR is the net (post-subsidy) IRR the model headlines.
+const olivePressBase = runScenario(
+  SCENARIOS[1],
+  INVESTMENT,
+  ROOMS,
+  OPERATING_DAYS_FULL,
+  MODEL_YEARS,
+  STATE_SUBSIDY_DEFAULT,
+);
+const olivePressEconomics: ProjectEconomics = {
+  totalCost: fmtMoney(INVESTMENT),
+  irr: fmtPct(olivePressBase.netIrr),
+};
+
+// Ellinikon Villa: the "Sell at Completion" base case of the build-sell model.
+const ellinikonBase = runBuildSellScenario(BUILD_SELL_DEFAULTS, BUILD_SELL_SCENARIOS[0]);
+const ellinikonEconomics: ProjectEconomics = {
+  totalCost: fmtMoney(ellinikonBase.totalProjectCost),
+  irr: fmtPct(ellinikonBase.annualisedIrr),
+};
+
 const olivePress: ProjectDef = {
   id: "olive-press",
   name: "Olive Press Hotel",
@@ -58,6 +99,7 @@ const olivePress: ProjectDef = {
     { label: "Opening", value: "Apr 2029" },
     { label: "State subsidy", value: "€3.0M" },
   ],
+  economics: olivePressEconomics,
   nav: [
     { key: "overview", label: "Overview", icon: LayoutDashboard, component: Overview },
     { key: "timeline", label: "Timeline", icon: GanttChart, component: Timeline },
@@ -90,6 +132,7 @@ const ellinikon: ProjectDef = {
     { label: "Land cost", value: "€13.0M" },
     { label: "Strategy", value: "Build & sell" },
   ],
+  economics: ellinikonEconomics,
   nav: [
     { key: "buildsell", label: "Build-Sell Model", icon: Building2, component: BuildSell },
     { key: "capex", label: "Construction CAPEX", icon: HardHat, component: ConstructionCapex },
