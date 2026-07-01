@@ -18,7 +18,7 @@ export const maniProject: ProjectDef = {
   status: "Due diligence",
   accent: "amber",
   sidebarBg: "#2b211a",
-  cover: "/mani/topo-plan.jpg",
+  cover: "/mani/cover.jpg",
   kpis: [
     { label: "Land area", value: kpis[0].value + " " + kpis[0].unit },
     { label: "Planned keys", value: kpis[1].value },
