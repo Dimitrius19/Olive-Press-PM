@@ -110,6 +110,34 @@ export const hbh: CaseData = {
     uses: ["Hotel", "Residence", "Offices", "Food & beverage", "Recreation", "Culture"],
   },
 
+  model: {
+    mode: "development",
+    years: [2026, 2027, 2028, 2029, 2030],
+    landPrice: 8_000_000,
+    acquisitionCostsPct: 0.05,
+    landLabel: "Land (asking)",
+    construction: {
+      hardCost: 33_000_000, // ≈€1,770/m² blended new-build + preserved restoration
+      softCostsPct: 0.12,
+      contingencyPct: 0.08,
+      schedule: [0, 0.3, 0.45, 0.25, 0],
+      label: "Build all-in (hard + soft + contingency)",
+    },
+    sale: {
+      saleableArea: 18_674, // full Σ.Δ. envelope, blended mixed-use value
+      pricePerSqm: 3_500, // prime Neo Faliro mixed-use (coast, SNFCC, metro)
+      sellingCostsPct: 0.03,
+      schedule: [0, 0, 0, 0.4, 0.6],
+    },
+    finance: { ltcPct: 0.55, interestRate: 0.07, label: "55% LTC @ 7.0%" },
+    operationalRisk: {
+      rating: "medium",
+      score: 64,
+      note: "Sold on completion, so no operating hold — but delivery is heavy: a large mixed-use scheme constrained by preserved volumes, a 10 m protection zone and heritage restoration.",
+    },
+    note: "Illustrative merchant-build model: €3,500/m² blended GDV across the 18,674 m² envelope, €1,770/m² all-in build, sold on completion. Sizes the return, not an underwrite.",
+  },
+
   risks: [
     {
       title: "Preserved-building constraints & restoration liability",

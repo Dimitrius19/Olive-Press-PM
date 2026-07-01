@@ -83,6 +83,34 @@ export const mavromichali: CaseData = {
     ],
   },
 
+  model: {
+    mode: "development",
+    years: [2026, 2027, 2028, 2029],
+    landPrice: 3_300_000,
+    acquisitionCostsPct: 0.05,
+    landLabel: "Land (asking, negotiable)",
+    construction: {
+      hardCost: 7_300_000, // ≈€1,600/m² over 4,568 m²
+      softCostsPct: 0.12,
+      contingencyPct: 0.08,
+      schedule: [0, 0.55, 0.45, 0],
+      label: "Build all-in (hard + soft + contingency)",
+    },
+    sale: {
+      saleableArea: 4_568,
+      pricePerSqm: 3_400, // central Piraeus new-build, walkable to port & metro
+      sellingCostsPct: 0.03,
+      schedule: [0, 0, 0.45, 0.55],
+    },
+    finance: { ltcPct: 0.55, interestRate: 0.07, label: "55% LTC @ 7.0%" },
+    operationalRisk: {
+      rating: "low",
+      score: 72,
+      note: "Straightforward residential merchant-build; the only operational wrinkles are the two-parcel assembly and corner-setback massing — no ongoing asset to run.",
+    },
+    note: "Illustrative merchant-build model: €3,400/m² GDV on 4,568 m², €1,600/m² all-in build, sold over 2027–28. Asking price used; the teaser notes it is negotiable.",
+  },
+
   risks: [
     {
       title: "Price negotiation outcome",

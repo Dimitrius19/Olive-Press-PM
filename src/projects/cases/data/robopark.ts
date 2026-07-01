@@ -81,6 +81,29 @@ export const robopark: CaseData = {
     },
   },
 
+  model: {
+    mode: "income",
+    years: [2026, 2027, 2028, 2029, 2030, 2031, 2032],
+    landPrice: 3_450_000, // recommended renegotiated entry, not the €3.75M asking
+    acquisitionCostsPct: 0.04,
+    landLabel: "Negotiated entry (≈€3.45M)",
+    income: {
+      // NOI ≈ parking revenue less ~€250k opex; +€14k antenna until 08/2028.
+      noi: [0, 284_000, 288_000, 285_000, 292_000, 299_000, 306_000],
+      exitYear: 6, // sell in 2032 after a 6-year hold
+      exitNoi: 306_000,
+      exitCapRate: 0.075,
+      saleCostsPct: 0.02,
+    },
+    finance: { ltcPct: 0.5, interestRate: 0.065, interestOnly: true, label: "50% LTV @ 6.5%, interest-only" },
+    operationalRisk: {
+      rating: "high",
+      score: 34,
+      note: "A single-use automated mechanical garage: capital-intensive, specialist maintenance, and a real income hold to run — the most operationally demanding asset in the set.",
+    },
+    note: "Illustrative income model on the €3.45M target: ≈€285k NOI, 6-year hold, 7.5% exit cap. Antenna income (€14k, to 08/2028) is inside the early-year NOI. Return, not underwrite.",
+  },
+
   risks: [
     {
       title: "Single-use automated mechanical plant",

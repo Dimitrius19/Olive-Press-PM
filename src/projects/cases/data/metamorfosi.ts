@@ -73,6 +73,34 @@ export const metamorfosi: CaseData = {
     uses: ["Pure residential (Αμιγής κατοικία)"],
   },
 
+  model: {
+    mode: "development",
+    years: [2026, 2027, 2028, 2029],
+    landPrice: 1_800_000,
+    acquisitionCostsPct: 0.05,
+    landLabel: "Land (asking)",
+    construction: {
+      hardCost: 4_850_000, // ≈€1,500/m² over 3,234 m²
+      softCostsPct: 0.12,
+      contingencyPct: 0.08,
+      schedule: [0, 0.55, 0.45, 0],
+      label: "Build all-in (hard + soft + contingency)",
+    },
+    sale: {
+      saleableArea: 3_234,
+      pricePerSqm: 3_000, // new residential in Metamorfosi
+      sellingCostsPct: 0.03,
+      schedule: [0, 0, 0.45, 0.55],
+    },
+    finance: { ltcPct: 0.55, interestRate: 0.07, label: "55% LTC @ 7.0%" },
+    operationalRisk: {
+      rating: "low",
+      score: 82,
+      note: "A clean, vacant, unencumbered residential plot — the most straightforward build in the set, with no existing structure or heritage overlay and no asset to operate.",
+    },
+    note: "Illustrative merchant-build model: €3,000/m² GDV on 3,234 m², €1,500/m² all-in build, sold over 2028–29. Sizes the return on a thin teaser; confirm local values.",
+  },
+
   risks: [
     {
       title: "Thin teaser — unverified parameters",

@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   MapPin,
   Calculator,
+  Coins,
   ShieldAlert,
 } from "lucide-react";
 import type { AccentKey, ProjectDef } from "../types";
@@ -10,6 +11,7 @@ import type { CaseData } from "./types";
 import { CaseOverview } from "./views/CaseOverview";
 import { CaseProperty } from "./views/CaseProperty";
 import { CaseAnalysis } from "./views/CaseAnalysis";
+import { CaseFinancials } from "./views/CaseFinancials";
 import { CaseRisks } from "./views/CaseRisks";
 
 // ── Accent → Tailwind class lookup ──
@@ -149,6 +151,7 @@ export function makeCaseProject(data: CaseData): ProjectDef {
       { key: "overview", label: "Overview", icon: LayoutDashboard, component: CaseOverview },
       { key: "property", label: "Property & Location", icon: MapPin, component: CaseProperty },
       { key: "valuation", label: "Valuation", icon: Calculator, component: CaseAnalysis },
+      { key: "financials", label: "Financials", icon: Coins, component: CaseFinancials },
       { key: "dd", label: "Due Diligence", icon: ShieldAlert, component: CaseRisks },
     ],
     Wrapper,

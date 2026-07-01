@@ -1,4 +1,5 @@
 import type { AccentKey } from "../types";
+import type { ModelAssumptions } from "./model";
 
 // One acquisition "opportunity case" (teaser) modelled as data. Each becomes a
 // self-contained project workspace via makeCaseProject(). Fields map onto the
@@ -105,7 +106,8 @@ export interface CaseData {
   // ── Valuation & analysis ──
   pricing: CaseFact[]; // €/m² metrics
   buildability?: CaseBuildability;
-  financials?: CaseFinancials;
+  financials?: CaseFinancials; // light teaser figures (optional)
+  model?: ModelAssumptions; // full cash-flow model driving the Financials tab
 
   // ── Risk & due diligence ──
   risks: CaseRisk[];

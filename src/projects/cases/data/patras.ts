@@ -94,6 +94,34 @@ export const patras: CaseData = {
     },
   },
 
+  model: {
+    mode: "development",
+    years: [2026, 2027, 2028, 2029],
+    landPrice: 3_400_000,
+    acquisitionCostsPct: 0.04,
+    landLabel: "Shell (asking)",
+    construction: {
+      hardCost: 4_000_000, // low end of the €4–6M completion range, as a target
+      softCostsPct: 0.05, // frame already stands — lighter design load
+      contingencyPct: 0.1, // heavier: completing an unfinished, unknown frame
+      schedule: [0, 0.6, 0.4, 0],
+      label: "Completion all-in (hard + soft + contingency)",
+    },
+    sale: {
+      saleableArea: 3_400, // saleable residential from the 3,560 m² above-ground GFA
+      pricePerSqm: 2_800, // ≈€159k across ~60 student / young-professional units
+      sellingCostsPct: 0.03,
+      schedule: [0, 0, 0.5, 0.5],
+    },
+    finance: { ltcPct: 0.55, interestRate: 0.075, label: "55% LTC @ 7.5%" },
+    operationalRisk: {
+      rating: "medium",
+      score: 48,
+      note: "Completing an unfinished frame carries structural and permit unknowns plus a commercial-to-residential change of use — more execution risk than a bare-plot build, but a merchant-sale exit.",
+    },
+    note: "Illustrative completion model at the €4M low end of the €4–6M range: €2,800/m² GDV on 3,400 m² (~60 units at ≈€159k). Return is sensitive to the completion cost, which must be tendered.",
+  },
+
   risks: [
     {
       title: "Completion-cost uncertainty",
