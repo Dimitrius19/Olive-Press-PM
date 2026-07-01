@@ -17,6 +17,8 @@ export interface ScenarioInputs {
   ltvPct: number; // Loan-to-Value, default 0 (no debt), range 0-0.80
   interestRate: number; // default 0.045 (4.5%)
   loanTermYears: number; // default 15
+  // Operating-cost structure (optional; sensible defaults applied in runScenario)
+  revenueLinkedOpexShare?: number; // fraction of operating cost that scales with revenue -- OTA commissions, management and franchise fees -- rather than with volume (default 0.35); the rest rides occupied nights and inflates at opexGrowth
   // Depreciation (optional; sensible defaults applied in runScenario)
   landValuePct?: number; // non-depreciable land as a fraction of investment (default 0.2)
   buildingUsefulLifeYears?: number; // straight-line life of the depreciable base (default 25 = 4%/yr, the Greek building rate)
@@ -213,18 +215,28 @@ export function runScenario(
   const sellingCostPct = inputs.sellingCostPct ?? 0.03;
 
   // Operating-cost anchor. The gopMargin input fixes the Year-1 margin; from it
-  // we back out the Year-1 operating cost per occupied night. Costs then inflate
-  // at opexGrowth each year while revenue per night rides adrGrowth, so the GOP
-  // margin is no longer pinned -- it compresses when opex outpaces ADR (the
-  // pessimistic case) and expands when ADR outpaces opex (the optimistic case).
-  // Opex scales with occupied nights (a volume driver), not with the room rate,
-  // since charging more per room does not raise the cost of cleaning it.
+  // we back out the Year-1 operating cost, then split it into two buckets that
+  // behave differently over the hold:
+  //   - Revenue-linked (OTA commissions, management and franchise fees): a fixed
+  //     percentage of revenue, so it rides the top line and never moves the
+  //     margin on its own. This is what keeps a high-ADR run from expanding
+  //     margins without limit -- some costs climb right along with the rate.
+  //   - Volume-variable (housekeeping, F&B cost of goods, laundry): a cost per
+  //     occupied night that inflates at opexGrowth. Charging more per room does
+  //     not raise the cost of cleaning it, so this bucket tracks volume, not rate.
+  // The GOP margin therefore drifts with the gap between ADR growth and opex
+  // growth, but only through the volume-variable slice -- compressing when opex
+  // outpaces ADR (pessimistic) and expanding, but more gently, when ADR pulls
+  // ahead (optimistic).
+  const revenueLinkedOpexShare = inputs.revenueLinkedOpexShare ?? 0.35;
   const year1OccupiedNights = Math.round(rooms * operatingDaysYear1 * inputs.occupancyYear1);
   const year1RoomRevenue = year1OccupiedNights * inputs.adrYear1;
   const year1FbRevenue = year1OccupiedNights * inputs.fbPerNight;
   const year1TotalRevenue = year1RoomRevenue + year1FbRevenue + year1RoomRevenue * inputs.otherRevenuePct;
-  const opexPerOccupiedNight =
-    year1OccupiedNights > 0 ? (year1TotalRevenue * (1 - inputs.gopMargin)) / year1OccupiedNights : 0;
+  const year1Opex = year1TotalRevenue * (1 - inputs.gopMargin);
+  const revenueLinkedOpexPct = year1TotalRevenue > 0 ? (year1Opex * revenueLinkedOpexShare) / year1TotalRevenue : 0;
+  const variableOpexPerOccupiedNight =
+    year1OccupiedNights > 0 ? (year1Opex * (1 - revenueLinkedOpexShare)) / year1OccupiedNights : 0;
 
   let cumulativeLeveragedCf = 0;
 
@@ -258,10 +270,14 @@ export function runScenario(
 
     const revpar = roomRevenue / availableNights;
 
-    // Operating costs scale with volume (occupied nights) and inflate at
-    // opexGrowth off the Year-1 anchor. GOP is revenue less those costs, so its
-    // margin drifts with the ADR-vs-opex growth gap instead of staying fixed.
-    const opex = occupiedNights * opexPerOccupiedNight * Math.pow(1 + inputs.opexGrowth, i);
+    // Operating costs in two buckets: a revenue-linked slice (commissions/fees)
+    // that stays a fixed share of the top line, and a volume-variable slice that
+    // scales with occupied nights and inflates at opexGrowth off the Year-1
+    // anchor. GOP is revenue less both, so its margin drifts with the ADR-vs-opex
+    // growth gap -- but only through the volume slice, so it cannot run away.
+    const revenueLinkedOpex = totalRevenue * revenueLinkedOpexPct;
+    const variableOpex = occupiedNights * variableOpexPerOccupiedNight * Math.pow(1 + inputs.opexGrowth, i);
+    const opex = revenueLinkedOpex + variableOpex;
     const gop = totalRevenue - opex;
     const capexReserve = totalRevenue * inputs.capexReservePct;
     const noi = gop - capexReserve;

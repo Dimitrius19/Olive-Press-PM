@@ -728,8 +728,9 @@ export function FinancialModel() {
                         compact
                       />
                       <p className="text-[10px] text-stone-400 leading-snug">
-                        GOP Margin sets Year 1; OpEx Growth then drives it each
-                        year, so the margin drifts as costs and ADR grow apart.
+                        GOP Margin sets Year 1. Volume costs then inflate at OpEx
+                        Growth while ~35% (commissions/fees) tracks revenue, so
+                        the margin drifts with the ADR-vs-cost gap but stays anchored.
                       </p>
                     </div>
 

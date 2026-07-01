@@ -178,3 +178,52 @@ describe("runScenario — operating-cost growth (margin drift)", () => {
     expect(fast.afterTaxIrr).toBeLessThan(slow.afterTaxIrr);
   });
 });
+
+describe("runScenario — revenue-linked operating costs (margin stabiliser)", () => {
+  const margin = (r: ReturnType<typeof run>, y: number) =>
+    r.projections[y].gop / r.projections[y].totalRevenue;
+  const last = MODEL_YEARS - 1;
+
+  it("anchors the Year-1 GOP margin to gopMargin no matter how the cost splits", () => {
+    // Whatever share of opex tracks revenue vs volume, Year 1 still backs out to
+    // the input margin exactly — the split only changes how the margin *drifts*.
+    for (const revenueLinkedOpexShare of [0, 0.35, 0.7, 1]) {
+      const r = run({ ...OPTIMISTIC, revenueLinkedOpexShare });
+      expect(margin(r, 0)).toBeCloseTo(OPTIMISTIC.gopMargin, 6);
+    }
+  });
+
+  it("holds the GOP margin dead flat across the hold when costs are fully revenue-linked", () => {
+    // Share = 1: every operating euro tracks the top line, so the margin cannot
+    // drift — it pins to gopMargin in every year, ADR-vs-opex gap notwithstanding.
+    const r = run({ ...OPTIMISTIC, revenueLinkedOpexShare: 1 });
+    expect(margin(r, 0)).toBeCloseTo(OPTIMISTIC.gopMargin, 6);
+    expect(margin(r, last)).toBeCloseTo(OPTIMISTIC.gopMargin, 6);
+    expect(margin(r, last)).toBeCloseTo(margin(r, 0), 6);
+  });
+
+  it("caps the Optimistic upside: a bigger revenue-linked share expands the late margin less", () => {
+    // ADR outruns opex, so the volume slice expands margins. Shifting cost onto
+    // the revenue-linked slice shrinks that expansion — the exit margin lands lower.
+    const thinLink = run({ ...OPTIMISTIC, revenueLinkedOpexShare: 0 });
+    const thickLink = run({ ...OPTIMISTIC, revenueLinkedOpexShare: 0.7 });
+    expect(margin(thinLink, last)).toBeGreaterThan(margin(thinLink, 0));
+    expect(margin(thickLink, last)).toBeLessThan(margin(thinLink, last));
+  });
+
+  it("softens the Pessimistic downside: a bigger revenue-linked share compresses the late margin less", () => {
+    // Opex outruns ADR, so the volume slice compresses margins. A thicker
+    // revenue-linked slice mutes that compression — the exit margin holds higher.
+    const thinLink = run({ ...PESSIMISTIC, revenueLinkedOpexShare: 0 });
+    const thickLink = run({ ...PESSIMISTIC, revenueLinkedOpexShare: 0.7 });
+    expect(margin(thinLink, last)).toBeLessThan(margin(thinLink, 0));
+    expect(margin(thickLink, last)).toBeGreaterThan(margin(thinLink, last));
+  });
+
+  it("defaults the revenue-linked share to 0.35 when the input is omitted", () => {
+    const implicit = run(OPTIMISTIC); // no revenueLinkedOpexShare set
+    const explicit = run({ ...OPTIMISTIC, revenueLinkedOpexShare: 0.35 });
+    expect(implicit.projections[last].gop).toBeCloseTo(explicit.projections[last].gop, 6);
+    expect(implicit.netIrr).toBeCloseTo(explicit.netIrr, 10);
+  });
+});
