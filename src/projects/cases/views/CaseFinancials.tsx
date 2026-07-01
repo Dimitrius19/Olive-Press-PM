@@ -202,7 +202,7 @@ export function CaseFinancials() {
       <Section
         eyebrow="Risk-adjusted view"
         title="Scorecard"
-        intro="Each deal is scored 0–100 on three axes — the modelled return, the risk register, and the operational burden of the asset — then blended (IRR 50%, risk 30%, operational 20%) into a single grade."
+        intro="Each deal is scored 0–100 on three axes — the modelled return, the development risk on the register, and the operational burden of the asset — then blended (IRR 50%, development risk 30%, operational 20%) into a single grade."
       >
         <Card className={`border-l-4 ${a.softBorder} bg-gradient-to-b ${a.softFrom} to-white`}>
           <div className="flex items-center gap-5">

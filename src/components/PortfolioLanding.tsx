@@ -37,6 +37,15 @@ const ACCENT_SOFT: Record<AccentKey, string> = {
   indigo: "bg-indigo-50/70 border-indigo-100",
 };
 
+// Solid fill for the risk-adjusted grade chip, matching the scorecard's grade
+// colours (A strong → D marginal). Keyed by the A–D letter grade.
+const GRADE_BADGE: Record<string, string> = {
+  A: "bg-emerald-500",
+  B: "bg-teal-500",
+  C: "bg-amber-500",
+  D: "bg-rose-500",
+};
+
 interface Props {
   onOpenProject: (id: string) => void;
 }
@@ -98,6 +107,22 @@ export function PortfolioLanding({ onOpenProject }: Props) {
                 >
                   {p.stage}
                 </span>
+                {p.score && (
+                  <span
+                    title={`${p.score.verdict} · risk-adjusted grade ${p.score.grade} (${p.score.composite}/100)`}
+                    className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-white/95 py-1 pl-1 pr-2.5 shadow-sm ring-1 ring-black/5 backdrop-blur"
+                  >
+                    <span
+                      className={`grid h-5 w-5 place-items-center rounded-full text-[11px] font-black text-white ${GRADE_BADGE[p.score.grade] ?? "bg-stone-500"}`}
+                    >
+                      {p.score.grade}
+                    </span>
+                    <span className="text-[11px] font-bold tabular-nums text-stone-700">
+                      {p.score.composite}
+                      <span className="font-medium text-stone-400">/100</span>
+                    </span>
+                  </span>
+                )}
                 <div className="absolute bottom-3 left-4 right-4">
                   <h2 className="text-lg font-bold text-white tracking-tight leading-tight">
                     {p.name}

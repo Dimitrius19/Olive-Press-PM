@@ -5,7 +5,7 @@ import type { CaseRisk } from "./types";
 // set of ModelAssumptions; computeModel() expands them into a year-by-year cash
 // flow, then derives an unlevered (project) IRR and a levered (equity) IRR plus
 // the usual return metrics. scoreCase() grades the deal on three axes — IRR,
-// risk and operational risk — into a single composite.
+// development risk and operational risk — into a single composite.
 //
 // All figures are illustrative: they layer market-reasonable assumptions on top
 // of the teaser facts and are meant to frame the return, not to underwrite it.
@@ -389,7 +389,7 @@ export function scoreCase(
         : "Return does not resolve on these assumptions.",
     },
     risk: {
-      label: "Risk",
+      label: "Development risk",
       score: riskScore,
       detail: `${risks.length} risks on the register — ${highs} high-severity, ${openRisks} still open.`,
     },

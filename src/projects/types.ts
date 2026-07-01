@@ -33,6 +33,17 @@ export interface ProjectEconomics {
   irr: string; // headline IRR, e.g. "17.1%"
 }
 
+// Risk-adjusted grade surfaced on the hub card. Blends the modelled IRR,
+// development risk (the risk register) and operational risk into a single
+// 0–100 composite and an A–D grade — see scoreCase() in cases/model.ts. Only
+// the opportunity cases carry this; the flagships use return conventions the
+// scorecard's IRR band isn't calibrated for, so they leave it undefined.
+export interface ProjectScore {
+  composite: number; // 0–100, rounded
+  grade: string; // A / B / C / D
+  verdict: string; // one-line risk-adjusted read (badge tooltip)
+}
+
 // A project is a self-contained workspace: its own brand, theme, headline KPIs
 // for the portfolio card, navigation set, and an optional state Wrapper (e.g.
 // the CAPEX provider that links the Ellinikon Villa build-up to its cost plan).
@@ -50,6 +61,7 @@ export interface ProjectDef {
   logo?: string;
   kpis: ProjectKpi[];
   economics?: ProjectEconomics; // headline total cost + IRR for the hub card
+  score?: ProjectScore; // risk-adjusted grade for the hub card (cases only)
   nav: ProjectNavItem[];
   Wrapper?: ComponentType<{ children: ReactNode }>;
 }

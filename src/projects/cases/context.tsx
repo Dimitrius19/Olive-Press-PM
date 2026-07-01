@@ -6,9 +6,9 @@ import {
   Coins,
   ShieldAlert,
 } from "lucide-react";
-import type { AccentKey, ProjectDef, ProjectEconomics } from "../types";
+import type { AccentKey, ProjectDef, ProjectEconomics, ProjectScore } from "../types";
 import type { CaseData } from "./types";
-import { computeModel, fmtMoney, fmtPct } from "./model";
+import { computeModel, scoreCase, fmtMoney, fmtPct } from "./model";
 import { CaseOverview } from "./views/CaseOverview";
 import { CaseProperty } from "./views/CaseProperty";
 import { CaseAnalysis } from "./views/CaseAnalysis";
@@ -136,12 +136,16 @@ export function makeCaseProject(data: CaseData): ProjectDef {
   );
   Wrapper.displayName = `CaseProvider(${data.id})`;
 
-  // Derive the hub-card headline economics from the case's financial model:
-  // the all-in project cost and the levered (equity) IRR.
+  // Derive the hub-card headline economics and risk-adjusted grade from the
+  // case's financial model: the all-in project cost, the levered (equity) IRR,
+  // and the blended IRR / development-risk / operational-risk scorecard.
   let economics: ProjectEconomics | undefined;
+  let score: ProjectScore | undefined;
   if (data.model) {
     const r = computeModel(data.model);
     economics = { totalCost: fmtMoney(r.totalCost), irr: fmtPct(r.equityIrr) };
+    const sc = scoreCase(r, data.risks, data.model.operationalRisk);
+    score = { composite: Math.round(sc.composite), grade: sc.grade, verdict: sc.verdict };
   }
 
   return {
@@ -157,6 +161,7 @@ export function makeCaseProject(data: CaseData): ProjectDef {
     cover: data.cover,
     kpis: data.kpis,
     economics,
+    score,
     nav: [
       { key: "overview", label: "Overview", icon: LayoutDashboard, component: CaseOverview },
       { key: "property", label: "Property & Location", icon: MapPin, component: CaseProperty },
