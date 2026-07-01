@@ -1,0 +1,131 @@
+import { ArrowRight, MapPin } from "lucide-react";
+import type { AccentKey } from "../projects/types";
+import { projects } from "../projects/registry";
+
+const ACCENT_BADGE: Record<AccentKey, string> = {
+  emerald: "bg-emerald-100 text-emerald-700 ring-emerald-600/20",
+  sky: "bg-sky-100 text-sky-700 ring-sky-600/20",
+  amber: "bg-amber-100 text-amber-700 ring-amber-600/20",
+  orange: "bg-orange-100 text-orange-700 ring-orange-600/20",
+  violet: "bg-violet-100 text-violet-700 ring-violet-600/20",
+  rose: "bg-rose-100 text-rose-700 ring-rose-600/20",
+  teal: "bg-teal-100 text-teal-700 ring-teal-600/20",
+  indigo: "bg-indigo-100 text-indigo-700 ring-indigo-600/20",
+};
+
+const ACCENT_CTA: Record<AccentKey, string> = {
+  emerald: "text-emerald-700",
+  sky: "text-sky-700",
+  amber: "text-amber-700",
+  orange: "text-orange-700",
+  violet: "text-violet-700",
+  rose: "text-rose-700",
+  teal: "text-teal-700",
+  indigo: "text-indigo-700",
+};
+
+interface Props {
+  onOpenProject: (id: string) => void;
+}
+
+export function PortfolioLanding({ onOpenProject }: Props) {
+  return (
+    <div className="min-h-screen bg-stone-100">
+      {/* ── Masthead ── */}
+      <header className="relative overflow-hidden bg-gradient-to-br from-stone-900 via-stone-800 to-stone-900">
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 15% 20%, rgba(16,185,129,0.35), transparent 40%), radial-gradient(circle at 85% 10%, rgba(56,189,248,0.3), transparent 40%), radial-gradient(circle at 60% 90%, rgba(245,158,11,0.3), transparent 45%)",
+          }}
+        />
+        <div className="relative max-w-6xl mx-auto px-8 py-14">
+          <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/80">
+            Tryfon Group · Real Estate
+          </span>
+          <h1 className="text-4xl font-bold text-white tracking-tight mt-4">
+            Development Portfolio
+          </h1>
+          <p className="text-stone-300/80 text-sm mt-2 max-w-2xl leading-relaxed">
+            A project-management workspace across the group's active developments and acquisition
+            studies. Select a project to open its dedicated dashboard.
+          </p>
+          <div className="mt-6 flex gap-8 text-white/90">
+            <div>
+              <span className="block text-2xl font-bold tabular-nums">{projects.length}</span>
+              <span className="text-[11px] uppercase tracking-widest text-white/50">Projects</span>
+            </div>
+            <div>
+              <span className="block text-2xl font-bold tabular-nums">6</span>
+              <span className="text-[11px] uppercase tracking-widest text-white/50">Regions</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Project grid ── */}
+      <div className="max-w-6xl mx-auto px-8 py-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {projects.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => onOpenProject(p.id)}
+              className="group text-left bg-white rounded-2xl border border-stone-200/80 shadow-sm overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all"
+            >
+              <div className="relative h-44 overflow-hidden bg-stone-200">
+                <img
+                  src={p.cover}
+                  alt={p.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                <span
+                  className={`absolute top-3 left-3 inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${ACCENT_BADGE[p.accent]}`}
+                >
+                  {p.stage}
+                </span>
+                <div className="absolute bottom-3 left-4 right-4">
+                  <h2 className="text-lg font-bold text-white tracking-tight leading-tight">
+                    {p.name}
+                  </h2>
+                  <span className="flex items-center gap-1 text-xs text-white/80 mt-0.5">
+                    <MapPin size={11} />
+                    {p.location}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-5">
+                <p className="text-sm text-stone-500 leading-relaxed min-h-[40px]">{p.tagline}</p>
+
+                <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-stone-100">
+                  {p.kpis.slice(0, 4).map((k) => (
+                    <div key={k.label}>
+                      <span className="block text-[10px] uppercase tracking-widest text-stone-400 font-medium">
+                        {k.label}
+                      </span>
+                      <span className="block text-sm font-bold text-stone-800 tabular-nums mt-0.5">
+                        {k.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <span
+                  className={`flex items-center gap-1.5 text-sm font-semibold mt-5 ${ACCENT_CTA[p.accent]}`}
+                >
+                  Open project
+                  <ArrowRight
+                    size={15}
+                    className="group-hover:translate-x-1 transition-transform"
+                  />
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
