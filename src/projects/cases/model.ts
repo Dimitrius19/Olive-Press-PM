@@ -342,10 +342,15 @@ export function computeModel(a: ModelAssumptions): ModelResult {
 
 // The minimal risk shape the register score needs. CaseRisk satisfies it, as do
 // the flagship registers (same severity/status scale), so one scoring path can
-// grade any project.
+// grade any project. `probability` and `category` are optional: a register that
+// rates likelihood (e.g. the Ellinikon register) gets a full likelihood × impact
+// treatment, and a category lets the score weigh genuine build / entitlement
+// risk above the market or financing risk the IRR and operational axes carry.
 export type RiskLike = {
   severity: "high" | "medium" | "low";
   status: "open" | "mitigating" | "resolved";
+  probability?: "high" | "medium" | "low";
+  category?: string;
 };
 
 // Map the levered (equity) IRR onto 0–100: 6% → 0, 30% → 100, linear between.
@@ -354,14 +359,57 @@ export function scoreIrr(eqIrr: number): number {
   return clamp(((eqIrr - 0.06) / (0.3 - 0.06)) * 100, 0, 100);
 }
 
-// Derive a risk score from a project's risk register: heavier, unmitigated risks
-// pull the score down.
+// ── Development-risk model ───────────────────────────────────────────────────
+// The score is a probability of clean delivery: 100 × Π(1 − hazardᵢ) over the
+// register. Each risk contributes an independent hazard built from expected loss
+// (likelihood × impact), discounted by how far it has been retired (status) and
+// weighted by how squarely it sits on the *development* axis (category). Reading
+// it as a survival product means the axis is monotonic (any risk can only lower
+// it), never saturates hard to zero the way an additive penalty does, and
+// rewards mitigation multiplicatively rather than by a flat subtraction.
+
+// Impact if the risk lands, by severity.
+const RISK_IMPACT: Record<RiskLike["severity"], number> = { high: 1.0, medium: 0.5, low: 0.2 };
+// Likelihood the risk lands. Registers that omit probability are treated as
+// medium so a bare severity/status register still scores sensibly.
+const RISK_LIKELIHOOD: Record<"high" | "medium" | "low", number> = { high: 0.9, medium: 0.6, low: 0.3 };
+// How live the exposure still is: mitigation halves it, resolution all but
+// retires it.
+const RISK_STATUS: Record<RiskLike["status"], number> = { open: 1.0, mitigating: 0.5, resolved: 0.15 };
+// Ceiling on a single open, high-severity, high-likelihood development risk so
+// one line can never by itself zero the axis.
+const RISK_HAZARD_CAP = 0.5;
+
+// Category weighting. The development axis is meant to price *build and
+// entitlement* execution — the risks specific to actually delivering the asset.
+// Market / sales / liquidity risk is already carried by the IRR axis, and
+// financing risk sits partly there too, so those are down-weighted here to avoid
+// double-counting. Anything unclassified (or a genuine build/permit/technical
+// risk) keeps full weight.
+export function developmentWeight(category?: string): number {
+  if (!category) return 1;
+  const c = category.toLowerCase();
+  if (/(market|sales|liquid|demand|macro|currency|fx|commercial|income|absorption|lease|buyer|exit)/.test(c))
+    return 0.6;
+  if (/(financ|debt|interest|tax|funding|capital)/.test(c)) return 0.8;
+  return 1;
+}
+
+// Derive a 0–100 development-risk score from a project's risk register. Higher is
+// safer (a clean register scores 100). Heavier, more-likely, still-open risks —
+// especially build / entitlement risks — pull it down the hardest.
 export function scoreRisk(risks: RiskLike[]): number {
-  const base: Record<RiskLike["severity"], number> = { high: 26, medium: 13, low: 5 };
-  const factor: Record<RiskLike["status"], number> = { open: 1, mitigating: 0.55, resolved: 0.2 };
-  let penalty = 0;
-  for (const r of risks) penalty += base[r.severity] * factor[r.status];
-  return clamp(100 - penalty, 0, 100);
+  let survival = 1;
+  for (const r of risks) {
+    const hazard =
+      RISK_HAZARD_CAP *
+      RISK_IMPACT[r.severity] *
+      RISK_LIKELIHOOD[r.probability ?? "medium"] *
+      RISK_STATUS[r.status] *
+      developmentWeight(r.category);
+    survival *= 1 - hazard;
+  }
+  return clamp(100 * survival, 0, 100);
 }
 
 export interface GradeResult {
@@ -412,7 +460,7 @@ export function scoreCase(
     risk: {
       label: "Development risk",
       score: riskScore,
-      detail: `${risks.length} risks on the register — ${highs} high-severity, ${openRisks} still open.`,
+      detail: `${risks.length} risks on the register — ${highs} high-severity, ${openRisks} still open. Scored as likelihood × impact per risk, retired by mitigation and weighted toward build & entitlement risk over market risk.`,
     },
     operational: {
       label: "Operational risk",

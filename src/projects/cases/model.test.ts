@@ -4,8 +4,11 @@ import {
   npv,
   computeModel,
   scoreCase,
+  scoreRisk,
+  developmentWeight,
   type ModelAssumptions,
   type OperationalRisk,
+  type RiskLike,
 } from "./model";
 
 describe("irr", () => {
@@ -170,5 +173,83 @@ describe("scoreCase", () => {
     const lowOp = scoreCase(strong, [], { rating: "low", score: 85, note: "" });
     const highOp = scoreCase(strong, [], { rating: "high", score: 30, note: "" });
     expect(lowOp.composite).toBeGreaterThan(highOp.composite);
+  });
+});
+
+describe("scoreRisk — survival-product development risk", () => {
+  const R = (over: Partial<RiskLike> = {}): RiskLike => ({
+    severity: "medium",
+    status: "open",
+    ...over,
+  });
+
+  it("scores a clean register at 100", () => {
+    expect(scoreRisk([])).toBe(100);
+  });
+
+  it("stays a probability of clean delivery within 0–100", () => {
+    const s = scoreRisk([R({ severity: "high" }), R({ severity: "low", status: "resolved" })]);
+    expect(s).toBeGreaterThanOrEqual(0);
+    expect(s).toBeLessThanOrEqual(100);
+  });
+
+  it("weights higher likelihood as more dangerous", () => {
+    const likely = scoreRisk([R({ probability: "high" })]);
+    const unlikely = scoreRisk([R({ probability: "low" })]);
+    expect(likely).toBeLessThan(unlikely);
+  });
+
+  it("weights higher severity as more dangerous", () => {
+    const high = scoreRisk([R({ severity: "high" })]);
+    const low = scoreRisk([R({ severity: "low" })]);
+    expect(high).toBeLessThan(low);
+  });
+
+  it("treats a missing probability as medium", () => {
+    expect(scoreRisk([R({ probability: undefined })])).toBeCloseTo(scoreRisk([R({ probability: "medium" })]), 9);
+  });
+
+  it("retires exposure as a risk moves open → mitigating → resolved", () => {
+    const open = scoreRisk([R({ severity: "high", status: "open" })]);
+    const mitigating = scoreRisk([R({ severity: "high", status: "mitigating" })]);
+    const resolved = scoreRisk([R({ severity: "high", status: "resolved" })]);
+    expect(open).toBeLessThan(mitigating);
+    expect(mitigating).toBeLessThan(resolved);
+  });
+
+  it("penalises build/entitlement risk more than the same market risk", () => {
+    const build = scoreRisk([R({ severity: "high", category: "Construction" })]);
+    const market = scoreRisk([R({ severity: "high", category: "Market / Sales" })]);
+    expect(build).toBeLessThan(market);
+  });
+
+  it("never saturates to zero and stays monotonic on a heavy register", () => {
+    const worst = R({ severity: "high", probability: "high", status: "open", category: "Technical" });
+    let prev = 100;
+    const register: RiskLike[] = [];
+    for (let i = 0; i < 25; i++) {
+      register.push(worst);
+      const s = scoreRisk(register);
+      expect(s).toBeLessThan(prev); // each added risk can only lower the score
+      expect(s).toBeGreaterThan(0); // but the axis never hits a dead floor
+      prev = s;
+    }
+  });
+});
+
+describe("developmentWeight", () => {
+  it("keeps full weight on unclassified and build/entitlement risk", () => {
+    expect(developmentWeight(undefined)).toBe(1);
+    expect(developmentWeight("Construction")).toBe(1);
+    expect(developmentWeight("Technical")).toBe(1);
+    expect(developmentWeight("Permit")).toBe(1);
+  });
+
+  it("ranks execution ≥ finance ≥ market so the axis prices build risk highest", () => {
+    const execution = developmentWeight("Technical");
+    const finance = developmentWeight("Finance");
+    const market = developmentWeight("Market / Liquidity");
+    expect(execution).toBeGreaterThan(finance);
+    expect(finance).toBeGreaterThan(market);
   });
 });
