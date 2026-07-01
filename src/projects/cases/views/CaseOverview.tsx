@@ -1,6 +1,7 @@
 import { Section, Card, CardTitle, Callout, BulletList } from "../ui";
 import { useCase, useAccentUI } from "../context";
 import { computeModel, scoreCase } from "../model";
+import { simulateCaseReturn } from "../../return-sim";
 import { RiskScorecard } from "../../../components/RiskScorecard";
 
 export function CaseOverview() {
@@ -9,7 +10,7 @@ export function CaseOverview() {
   const [g0, g1, g2] = c.heroGradient;
 
   const m = c.model;
-  const score = m ? scoreCase(computeModel(m), c.risks, m.operationalRisk) : null;
+  const score = m ? scoreCase(computeModel(m), c.risks, m.operationalRisk, simulateCaseReturn(m)) : null;
 
   return (
     <div className="-mx-8 -mt-8">

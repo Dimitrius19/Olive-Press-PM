@@ -1,4 +1,5 @@
 import type { CaseRisk } from "./types";
+import { scoreReturnDistribution, type SimStats } from "../../lib/simulate";
 
 // ── Financial model engine ───────────────────────────────────────────────────
 // A transparent, teaser-grade development / income model. Each case supplies a
@@ -107,6 +108,7 @@ export interface ScoreAxis {
   label: string;
   score: number; // 0–100
   detail: string;
+  dist?: SimStats; // present when the axis is scored from a return distribution
 }
 
 export interface Scorecard {
@@ -354,9 +356,23 @@ export type RiskLike = {
 };
 
 // Map the levered (equity) IRR onto 0–100: 6% → 0, 30% → 100, linear between.
+// Retained as the fallback for a bare point estimate; the distribution-aware
+// scoreReturnDistribution() (../../lib/simulate) is preferred wherever a
+// simulated SimStats is available, because it grades against the deal's own
+// hurdle instead of one fixed band.
 export function scoreIrr(eqIrr: number): number {
   if (!isFinite(eqIrr)) return 0;
   return clamp(((eqIrr - 0.06) / (0.3 - 0.06)) * 100, 0, 100);
+}
+
+// One-line summary of a return distribution against its hurdle. Shared by the
+// case and flagship scorecards so the P10/P50/P90-versus-hurdle phrasing reads
+// identically everywhere.
+export function fmtReturnDist(stats: SimStats): string {
+  const p = Math.round(clamp(stats.probAtLeastHurdle, 0, 1) * 100);
+  return `P50 ≈ ${fmtPct(stats.p50)} (P10 ${fmtPct(stats.p10)} · P90 ${fmtPct(
+    stats.p90,
+  )}), against a ${fmtPct(stats.hurdle)} hurdle it clears in ${p}% of trials.`;
 }
 
 // ── Development-risk model ───────────────────────────────────────────────────
@@ -440,8 +456,12 @@ export function scoreCase(
   model: ModelResult,
   risks: CaseRisk[],
   op: OperationalRisk,
+  // Simulated return distribution (from ../return-sim). When supplied, the IRR
+  // axis is graded against the deal's own hurdle; without it we fall back to the
+  // flat point map so a bare model still scores.
+  stats?: SimStats,
 ): Scorecard {
-  const irrScore = scoreIrr(model.equityIrr);
+  const irrScore = stats ? scoreReturnDistribution(stats) : scoreIrr(model.equityIrr);
   const riskScore = scoreRisk(risks);
   const opScore = clamp(op.score, 0, 100);
   const { composite, grade, verdict } = composeGrade(irrScore, riskScore, opScore);
@@ -449,13 +469,18 @@ export function scoreCase(
   const highs = risks.filter((r) => r.severity === "high").length;
   const openRisks = risks.filter((r) => r.status === "open").length;
 
+  const mult = isFinite(model.equityMultiple) ? ` Base case ${fmtX(model.equityMultiple)} equity multiple.` : "";
+
   return {
     irr: {
       label: "IRR",
       score: irrScore,
-      detail: isFinite(model.equityIrr)
-        ? `Equity IRR ≈ ${fmtPct(model.equityIrr)} on ${fmtX(model.equityMultiple)} equity multiple.`
-        : "Return does not resolve on these assumptions.",
+      detail: stats
+        ? `Equity IRR ${fmtReturnDist(stats)}${mult}`
+        : isFinite(model.equityIrr)
+          ? `Equity IRR ≈ ${fmtPct(model.equityIrr)} on ${fmtX(model.equityMultiple)} equity multiple.`
+          : "Return does not resolve on these assumptions.",
+      dist: stats,
     },
     risk: {
       label: "Development risk",

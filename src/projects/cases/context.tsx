@@ -9,6 +9,7 @@ import {
 import type { AccentKey, ProjectDef, ProjectEconomics, ProjectScore } from "../types";
 import type { CaseData } from "./types";
 import { computeModel, scoreCase, fmtMoney, fmtPct } from "./model";
+import { simulateCaseReturn } from "../return-sim";
 import { CaseOverview } from "./views/CaseOverview";
 import { CaseProperty } from "./views/CaseProperty";
 import { CaseAnalysis } from "./views/CaseAnalysis";
@@ -144,7 +145,7 @@ export function makeCaseProject(data: CaseData): ProjectDef {
   if (data.model) {
     const r = computeModel(data.model);
     economics = { totalCost: fmtMoney(r.totalCost), irr: fmtPct(r.equityIrr) };
-    const sc = scoreCase(r, data.risks, data.model.operationalRisk);
+    const sc = scoreCase(r, data.risks, data.model.operationalRisk, simulateCaseReturn(data.model));
     score = { composite: Math.round(sc.composite), grade: sc.grade, verdict: sc.verdict };
   }
 

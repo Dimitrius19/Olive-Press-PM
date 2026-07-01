@@ -1,4 +1,5 @@
-import type { Scorecard, ScoreAxis } from "../projects/cases/model";
+import { clamp, fmtPct, type Scorecard, type ScoreAxis } from "../projects/cases/model";
+import type { SimStats } from "../lib/simulate";
 
 // Presentational risk-adjusted scorecard — a composite grade hero plus the three
 // axis bars (IRR / development risk / operational) that compose it. Self-contained
@@ -13,7 +14,53 @@ function band(score: number) {
   return { bar: "bg-rose-500", text: "text-rose-600" };
 }
 
-function ScoreBar({ label, score, detail }: ScoreAxis) {
+// Return-distribution fan: a P10–P90 band with the P50 marker and the hurdle
+// tick, on a shared scale. Renders under the IRR axis when the score came from a
+// Monte-Carlo distribution — so the reader sees dispersion and the bar the deal
+// must clear, not just a single grade.
+function DistFan({ dist }: { dist: SimStats }) {
+  const { p10, p50, p90, hurdle } = dist;
+  const lo = Math.min(p10, hurdle);
+  const hi = Math.max(p90, hurdle);
+  const pad = (hi - lo) * 0.12 || 0.01;
+  const dLo = lo - pad;
+  const span = hi + pad - dLo || 1;
+  const pos = (x: number) => clamp(((x - dLo) / span) * 100, 0, 100);
+  const beats = p50 >= hurdle;
+  const prob = Math.round(clamp(dist.probAtLeastHurdle, 0, 1) * 100);
+  return (
+    <div className="mt-2">
+      <div className="relative h-4">
+        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-stone-100" />
+        <div
+          className="absolute top-1/2 -translate-y-1/2 h-1.5 rounded-full bg-stone-300"
+          style={{ left: `${pos(p10)}%`, width: `${pos(p90) - pos(p10)}%` }}
+        />
+        {/* hurdle tick */}
+        <div
+          className="absolute top-0 bottom-0 w-px bg-stone-500"
+          style={{ left: `${pos(hurdle)}%` }}
+        />
+        {/* P50 marker */}
+        <div
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full ring-2 ring-white ${
+            beats ? "bg-emerald-500" : "bg-rose-500"
+          }`}
+          style={{ left: `${pos(p50)}%` }}
+        />
+      </div>
+      <div className="flex justify-between text-[10px] text-stone-400 tabular-nums mt-1">
+        <span>P10 {fmtPct(p10)}</span>
+        <span className="text-stone-500">
+          hurdle {fmtPct(hurdle)} · {prob}% clear
+        </span>
+        <span>P90 {fmtPct(p90)}</span>
+      </div>
+    </div>
+  );
+}
+
+function ScoreBar({ label, score, detail, dist }: ScoreAxis) {
   const b = band(score);
   return (
     <div>
@@ -27,6 +74,7 @@ function ScoreBar({ label, score, detail }: ScoreAxis) {
       <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
         <div className={`h-full rounded-full ${b.bar}`} style={{ width: `${score}%` }} />
       </div>
+      {dist && <DistFan dist={dist} />}
       <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">{detail}</p>
     </div>
   );

@@ -4,17 +4,20 @@
 // from its own base-case model, then the shared composeGrade() blends the three
 // axes (IRR 50% / development risk 30% / operational 20%).
 //
-// Two flagship-specific caveats are spelled out in the axis details, because each
-// project headlines a return convention the cases' IRR axis isn't calibrated for
-// (the axis maps a levered *development* equity IRR: 6% → 0, 30% → 100):
-//  · Olive Press headlines a stabilised, post-subsidy *net* yield (~6.5%), which
-//    sits on the floor of that band and so caps the composite whatever the risk
-//    axes say. Its live risk register is Supabase-backed and unavailable at build
-//    time, so the development-risk axis is a hand-set assessment, not a computed
-//    register score.
-//  · Ellinikon headlines an *annualised* short-hold sale IRR (~57%), which pins
-//    the same axis to 100 and effectively carries the grade; its development-risk
-//    axis is scored from the real, rated Ellinikon register.
+// Each flagship's IRR axis is now graded from a simulated *return distribution*
+// (see ../lib/simulate + ./return-sim): the base-case drivers are widened into
+// 3-point bands, drawn with correlation, and measured against a strategy-specific
+// hurdle (../lib/hurdle) — so a stabilised yield and a short-hold merchant trade
+// are judged against different bars instead of one fixed 6→30 band.
+//  · Olive Press headlines a stabilised, post-subsidy *net* IRR (~6.5%), scored
+//    against an income hurdle; the real Pessimistic/Base/Optimistic hotel
+//    scenarios supply the driver bands. Its live risk register is Supabase-backed
+//    and unavailable at build time, so the development-risk axis stays a hand-set
+//    assessment, not a computed register score.
+//  · Ellinikon headlines an *annualised* short-hold sale IRR (~57%), scored
+//    against a merchant hurdle it clears across essentially the whole
+//    distribution; its development-risk axis is scored from the real, rated
+//    Ellinikon register.
 
 import {
   runScenario,
@@ -33,12 +36,14 @@ import {
 import {
   fmtMoney,
   fmtPct,
-  scoreIrr,
+  fmtReturnDist,
   scoreRisk,
   composeGrade,
   type RiskLike,
   type Scorecard,
 } from "./cases/model";
+import { scoreReturnDistribution } from "../lib/simulate";
+import { simulateHotelReturn, simulateVillaReturn } from "./return-sim";
 import { RISKS as ELLINIKON_RISKS } from "../views/EllinikonRisks";
 import type { ProjectEconomics, ProjectScore } from "./types";
 
@@ -65,8 +70,10 @@ export const olivePressEconomics: ProjectEconomics = {
   irr: fmtPct(olivePressBase.netIrr),
 };
 
+export const olivePressStats = simulateHotelReturn();
+
 export const olivePressScorecard: Scorecard = (() => {
-  const irrScore = scoreIrr(olivePressBase.netIrr);
+  const irrScore = scoreReturnDistribution(olivePressStats);
   const devRisk = 55; // active build, historic conversion; permits + €3M subsidy secured
   const opRisk = 45; // 48-key operating hotel — seasonal, staff- and F&B-intensive
   const { composite, grade, verdict } = composeGrade(irrScore, devRisk, opRisk);
@@ -74,9 +81,10 @@ export const olivePressScorecard: Scorecard = (() => {
     irr: {
       label: "IRR",
       score: irrScore,
-      detail: `Net IRR ≈ ${fmtPct(
-        olivePressBase.netIrr,
-      )} is a stabilised, post-subsidy yield — below the levered development-return band this axis measures (6% → 0, 30% → 100), so it sits near the floor.`,
+      dist: olivePressStats,
+      detail: `Stabilised, post-subsidy net IRR ${fmtReturnDist(
+        olivePressStats,
+      )} Graded against an income hurdle — a yield play, not a development return.`,
     },
     risk: {
       label: "Development risk",
@@ -108,8 +116,10 @@ export const ellinikonEconomics: ProjectEconomics = {
   irr: fmtPct(ellinikonBase.annualisedIrr),
 };
 
+export const ellinikonStats = simulateVillaReturn();
+
 export const ellinikonScorecard: Scorecard = (() => {
-  const irrScore = scoreIrr(ellinikonBase.annualisedIrr);
+  const irrScore = scoreReturnDistribution(ellinikonStats);
   const riskScore = scoreRisk(ellinikonRegister);
   const opRisk = 82; // build-to-sell: no operating business retained after the sale
   const { composite, grade, verdict } = composeGrade(irrScore, riskScore, opRisk);
@@ -119,9 +129,10 @@ export const ellinikonScorecard: Scorecard = (() => {
     irr: {
       label: "IRR",
       score: irrScore,
-      detail: `Annualised sell-at-completion IRR ≈ ${fmtPct(
-        ellinikonBase.annualisedIrr,
-      )} — a short-hold merchant return that pins this axis to the top of its range.`,
+      dist: ellinikonStats,
+      detail: `Annualised sell-at-completion IRR ${fmtReturnDist(
+        ellinikonStats,
+      )} A short-hold merchant return, graded against a merchant hurdle.`,
     },
     risk: {
       label: "Development risk",

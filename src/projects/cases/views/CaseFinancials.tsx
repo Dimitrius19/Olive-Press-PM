@@ -9,6 +9,7 @@ import {
   fmtPct,
   fmtX,
 } from "../model";
+import { simulateCaseReturn } from "../../return-sim";
 import { RiskScorecard } from "../../../components/RiskScorecard";
 
 export function CaseFinancials() {
@@ -27,7 +28,7 @@ export function CaseFinancials() {
   }
 
   const r = computeModel(m);
-  const score = scoreCase(r, c.risks, m.operationalRisk);
+  const score = scoreCase(r, c.risks, m.operationalRisk, simulateCaseReturn(m));
   const isDev = m.mode === "development";
 
   // Going-in yield for income assets: year-1 NOI over the all-in acquisition cost.
