@@ -20,6 +20,8 @@ export interface ScenarioInputs {
   // Depreciation (optional; sensible defaults applied in runScenario)
   landValuePct?: number; // non-depreciable land as a fraction of investment (default 0.2)
   buildingUsefulLifeYears?: number; // straight-line life of the depreciable base (default 25 = 4%/yr, the Greek building rate)
+  // Disposal (optional; sensible defaults applied in runScenario)
+  sellingCostPct?: number; // agency + legal + transfer friction on the sale, as a fraction of gross proceeds (default 0.03, the house convention used across the land cases)
 }
 
 export interface YearProjection {
@@ -55,7 +57,8 @@ export interface ScenarioResult {
   paybackYear: number | null;
   totalRevenuePerRoom: number;
   terminalValue: number;
-  terminalGainsTax: number; // corporate tax on the disposal gain (terminalValue - written-down basis)
+  sellingCosts: number; // disposition friction (agency/legal/transfer) netted from the gross terminal value
+  terminalGainsTax: number; // corporate tax on the disposal gain (net proceeds - written-down basis)
   annualDepreciation: number; // straight-line depreciation charged each operating year
   accumulatedDepreciation: number; // total depreciation written off by disposal
   totalReturn: number;
@@ -207,6 +210,7 @@ export function runScenario(
   const buildingUsefulLifeYears = inputs.buildingUsefulLifeYears ?? 25;
   const depreciableBase = investment * (1 - landValuePct);
   const annualDepreciation = depreciableBase / buildingUsefulLifeYears;
+  const sellingCostPct = inputs.sellingCostPct ?? 0.03;
 
   let cumulativeLeveragedCf = 0;
 
@@ -286,29 +290,41 @@ export function runScenario(
     });
   }
 
-  // Terminal value based on last year NOI
+  // Terminal value based on last year NOI. This is the gross asset value
+  // (stabilised NOI capitalised at the exit cap rate); the cash a seller nets is
+  // lower once disposition friction is paid.
   const lastNoi = projections[projections.length - 1].noi;
   const terminalValue = lastNoi / inputs.terminalCapRate;
 
-  // Capital-gains tax on disposal. The taxable gain is the sale proceeds
-  // (terminal value) less the asset's WRITTEN-DOWN tax basis: the all-in
-  // investment net of the depreciation already claimed. Depreciation therefore
-  // does not escape tax — it is recaptured here, enlarging the gain. A Greek
-  // company folds the gain into taxable profit at the corporate rate, so we
-  // reuse corporateTaxRate rather than the (currently suspended) 15% individual
-  // property-gains rate. A loss on sale yields no rebate — floored at zero.
+  // Disposition friction: agency, legal and transfer costs consume a slice of the
+  // gross proceeds on the way out. Every other disposal in this codebase (the
+  // land cases, the build-and-sell model) already nets this; the hotel exit now
+  // matches, so the sale is not modelled as frictionless. It is a real pre-tax
+  // cash cost, so it flows into every exit-year cash flow below.
+  const sellingCosts = terminalValue * sellingCostPct;
+  const netDisposalProceeds = terminalValue - sellingCosts;
+
+  // Capital-gains tax on disposal. The taxable gain is the NET proceeds (gross
+  // less selling costs, which are deductible) less the asset's WRITTEN-DOWN tax
+  // basis: the all-in investment net of the depreciation already claimed.
+  // Depreciation therefore does not escape tax — it is recaptured here, enlarging
+  // the gain. A Greek company folds the gain into taxable profit at the corporate
+  // rate, so we reuse corporateTaxRate rather than the (currently suspended) 15%
+  // individual property-gains rate. A loss on sale yields no rebate — floored at
+  // zero.
   const accumulatedDepreciation = Math.min(annualDepreciation * modelYears, depreciableBase);
   const taxBasisAtExit = investment - accumulatedDepreciation;
-  const terminalGain = Math.max(0, terminalValue - taxBasisAtExit);
+  const terminalGain = Math.max(0, netDisposalProceeds - taxBasisAtExit);
   const terminalGainsTax = terminalGain * inputs.corporateTaxRate;
-  const terminalAfterTax = terminalValue - terminalGainsTax;
+  const terminalAfterTax = netDisposalProceeds - terminalGainsTax;
 
-  // Cash flows for IRR: Year 0 = -investment, Years 1-N = NOI, last year = NOI + terminal
+  // Cash flows for IRR: Year 0 = -investment, Years 1-N = NOI, last year = NOI +
+  // net disposal proceeds (gross terminal value less selling costs).
   const cashFlows: number[] = [-investment];
   for (let i = 0; i < projections.length; i++) {
     const cf =
       i === projections.length - 1
-        ? projections[i].noi + terminalValue
+        ? projections[i].noi + netDisposalProceeds
         : projections[i].noi;
     cashFlows.push(cf);
   }
@@ -383,7 +399,7 @@ export function runScenario(
   for (let i = 0; i < projections.length; i++) {
     const cf =
       i === projections.length - 1
-        ? projections[i].noi + terminalValue
+        ? projections[i].noi + netDisposalProceeds
         : projections[i].noi;
     netCashFlows.push(cf);
   }
@@ -400,6 +416,7 @@ export function runScenario(
     paybackYear,
     totalRevenuePerRoom,
     terminalValue,
+    sellingCosts,
     terminalGainsTax,
     annualDepreciation,
     accumulatedDepreciation,

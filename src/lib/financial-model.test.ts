@@ -30,10 +30,11 @@ function afterTaxIrrFromTerminal(r: ReturnType<typeof run>, terminalInflow: numb
 }
 
 describe("runScenario — disposal gain is taxed", () => {
-  it("taxes the recaptured gain (proceeds − written-down basis) at the corporate rate", () => {
+  it("taxes the recaptured gain (net proceeds − written-down basis) at the corporate rate", () => {
     const r = run(OPTIMISTIC);
     const basis = INVESTMENT - r.accumulatedDepreciation;
-    const expectedGain = Math.max(0, r.terminalValue - basis);
+    // Selling costs are deductible, so the gain is measured on proceeds net of them.
+    const expectedGain = Math.max(0, r.terminalValue - r.sellingCosts - basis);
     expect(expectedGain).toBeGreaterThan(0);
     expect(r.terminalGainsTax).toBeCloseTo(expectedGain * OPTIMISTIC.corporateTaxRate, 6);
   });
@@ -44,10 +45,10 @@ describe("runScenario — disposal gain is taxed", () => {
     expect(r.terminalGainsTax).toBeGreaterThan(0);
   });
 
-  it("after-tax IRR uses proceeds NET of the gains tax", () => {
+  it("after-tax IRR uses proceeds NET of selling costs and the gains tax", () => {
     const r = run(OPTIMISTIC);
-    // Wiring: reconstructing with (terminalValue − tax) reproduces the model's IRR.
-    expect(afterTaxIrrFromTerminal(r, r.terminalValue - r.terminalGainsTax)).toBeCloseTo(r.afterTaxIrr, 10);
+    // Wiring: reconstructing with (terminalValue − sellingCosts − tax) reproduces it.
+    expect(afterTaxIrrFromTerminal(r, r.terminalValue - r.sellingCosts - r.terminalGainsTax)).toBeCloseTo(r.afterTaxIrr, 10);
   });
 
   it("the fix bites: crediting the full terminal (old behaviour) overstates the IRR", () => {
@@ -76,7 +77,7 @@ describe("runScenario — disposal gain is taxed", () => {
   it("the gains tax is basis-driven, independent of leverage", () => {
     const levered = run({ ...OPTIMISTIC, ltvPct: 0.5 });
     const basis = INVESTMENT - levered.accumulatedDepreciation;
-    const expectedGain = Math.max(0, levered.terminalValue - basis);
+    const expectedGain = Math.max(0, levered.terminalValue - levered.sellingCosts - basis);
     expect(levered.terminalGainsTax).toBeCloseTo(expectedGain * OPTIMISTIC.corporateTaxRate, 6);
     expect(Number.isFinite(levered.leveragedIrr)).toBe(true);
   });
@@ -112,5 +113,37 @@ describe("runScenario — depreciation", () => {
     const r = run({ ...BASE, buildingUsefulLifeYears: 5 });
     const base = INVESTMENT * (1 - 0.2);
     expect(r.accumulatedDepreciation).toBeCloseTo(base, 6);
+  });
+});
+
+describe("runScenario — disposition (selling) costs", () => {
+  it("charges the default 3% disposition friction on the gross terminal value", () => {
+    const r = run(BASE);
+    expect(r.sellingCosts).toBeCloseTo(r.terminalValue * 0.03, 6);
+  });
+
+  it("honours a custom selling-cost rate", () => {
+    const r = run({ ...BASE, sellingCostPct: 0.05 });
+    expect(r.sellingCosts).toBeCloseTo(r.terminalValue * 0.05, 6);
+  });
+
+  it("drops to zero friction when the rate is zero", () => {
+    const r = run({ ...BASE, sellingCostPct: 0 });
+    expect(r.sellingCosts).toBe(0);
+  });
+
+  it("a frictionless sale beats one that pays disposition costs (pre- and after-tax)", () => {
+    const withCosts = run(OPTIMISTIC); // default 3%
+    const frictionless = run({ ...OPTIMISTIC, sellingCostPct: 0 });
+    expect(withCosts.irr).toBeLessThan(frictionless.irr);
+    expect(withCosts.afterTaxIrr).toBeLessThan(frictionless.afterTaxIrr);
+  });
+
+  it("selling costs shrink the taxable gain (they are deductible on the way out)", () => {
+    const heavyCosts = run({ ...OPTIMISTIC, sellingCostPct: 0.1 });
+    const frictionless = run({ ...OPTIMISTIC, sellingCostPct: 0 });
+    // Same gross terminal value and basis; a larger cost leaves a smaller gain.
+    expect(heavyCosts.terminalValue).toBeCloseTo(frictionless.terminalValue, 6);
+    expect(heavyCosts.terminalGainsTax).toBeLessThan(frictionless.terminalGainsTax);
   });
 });
