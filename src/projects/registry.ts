@@ -12,30 +12,8 @@ import {
   Building2,
   HardHat,
 } from "lucide-react";
-import type { ProjectDef, ProjectEconomics, ProjectScore } from "./types";
+import type { ProjectDef } from "./types";
 import { CapexProvider } from "../lib/capex-context";
-import {
-  fmtMoney,
-  fmtPct,
-  scoreIrr,
-  scoreRisk,
-  composeGrade,
-  type RiskLike,
-} from "./cases/model";
-import {
-  runScenario,
-  SCENARIOS,
-  INVESTMENT,
-  ROOMS,
-  OPERATING_DAYS_FULL,
-  MODEL_YEARS,
-  STATE_SUBSIDY_DEFAULT,
-} from "../lib/financial-model";
-import {
-  runBuildSellScenario,
-  BUILD_SELL_DEFAULTS,
-  BUILD_SELL_SCENARIOS,
-} from "../lib/build-sell-model";
 
 // Olive Press views (Supabase-backed PM workspace)
 import { Overview } from "../views/Overview";
@@ -53,7 +31,7 @@ import { FinancialModel } from "../views/FinancialModel";
 import { BuildSell } from "../views/BuildSell";
 import { ConstructionCapex } from "../views/ConstructionCapex";
 import { EllinikonMarketCheck } from "../views/EllinikonMarketCheck";
-import { EllinikonRisks, RISKS as ELLINIKON_RISKS } from "../views/EllinikonRisks";
+import { EllinikonRisks } from "../views/EllinikonRisks";
 
 // Mani estate (self-contained project package)
 import { maniProject } from "./mani";
@@ -61,63 +39,15 @@ import { maniProject } from "./mani";
 // Acquisition opportunity cases (data-driven shared framework)
 import { caseProjects } from "./cases";
 
-// ── Headline economics for the two flagship projects ──
-// Each is derived from that project's own base-case model so the hub card shows
-// a real total cost + IRR, consistent with the opportunity cases.
-
-// Olive Press: the base scenario of the hotel model. Total cost is the all-in
-// investment; IRR is the net (post-subsidy) IRR the model headlines.
-const olivePressBase = runScenario(
-  SCENARIOS[1],
-  INVESTMENT,
-  ROOMS,
-  OPERATING_DAYS_FULL,
-  MODEL_YEARS,
-  STATE_SUBSIDY_DEFAULT,
-);
-const olivePressEconomics: ProjectEconomics = {
-  totalCost: fmtMoney(INVESTMENT),
-  irr: fmtPct(olivePressBase.netIrr),
-};
-
-// Risk-adjusted grade for the hub card, on the same 0–100 scorecard as the
-// opportunity cases (IRR 50% / development 30% / operational 20%). Two caveats
-// are specific to this asset:
-//  · the scorecard's IRR axis is calibrated for levered *development* equity IRRs
-//    (6% → 0, 30% → 100); Olive Press headlines a stabilised, post-subsidy *net*
-//    yield (~6.5%), which sits on the band floor and caps the composite whatever
-//    the risk axes say.
-//  · the live risk register is Supabase-backed and not available at build time, so
-//    the development-risk axis is a hand-set assessment, not a computed penalty.
-const olivePressScore: ProjectScore = (() => {
-  const irrScore = scoreIrr(olivePressBase.netIrr);
-  const devRisk = 55; // active build, historic conversion; permits + €3M subsidy secured
-  const opRisk = 45; // 48-key operating hotel — seasonal, staff- and F&B-intensive
-  const { composite, grade, verdict } = composeGrade(irrScore, devRisk, opRisk);
-  return { composite: Math.round(composite), grade, verdict };
-})();
-
-// Ellinikon Villa: the "Sell at Completion" base case of the build-sell model.
-const ellinikonBase = runBuildSellScenario(BUILD_SELL_DEFAULTS, BUILD_SELL_SCENARIOS[0]);
-const ellinikonEconomics: ProjectEconomics = {
-  totalCost: fmtMoney(ellinikonBase.totalProjectCost),
-  irr: fmtPct(ellinikonBase.annualisedIrr),
-};
-
-// Risk-adjusted grade for the hub card, on the same scorecard as the cases.
-// Development risk is scored from the real, rated Ellinikon register; operational
-// risk is low because a merchant build-and-sell leaves no asset to run. Note the
-// IRR axis reads this project's *annualised* short-hold sale IRR — a different
-// convention from the cases' multi-year levered equity IRR — so it pins to 100
-// and effectively carries the grade.
-const ellinikonRegister: RiskLike[] = ELLINIKON_RISKS;
-const ellinikonScore: ProjectScore = (() => {
-  const irrScore = scoreIrr(ellinikonBase.annualisedIrr);
-  const riskScore = scoreRisk(ellinikonRegister);
-  const opRisk = 82; // build-to-sell: no operating business retained after the sale
-  const { composite, grade, verdict } = composeGrade(irrScore, riskScore, opRisk);
-  return { composite: Math.round(composite), grade, verdict };
-})();
+// Flagship headline economics + risk-adjusted grades, each derived from that
+// project's own base-case model. Centralised so the hub cards and the in-project
+// scorecards read from a single source and never drift apart.
+import {
+  olivePressEconomics,
+  olivePressScore,
+  ellinikonEconomics,
+  ellinikonScore,
+} from "./flagship-scores";
 
 const olivePress: ProjectDef = {
   id: "olive-press",

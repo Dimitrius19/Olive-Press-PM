@@ -1,9 +1,15 @@
 import { Section, Card, CardTitle, Callout, BulletList } from "../ui";
-import { useCase } from "../context";
+import { useCase, useAccentUI } from "../context";
+import { computeModel, scoreCase } from "../model";
+import { RiskScorecard } from "../../../components/RiskScorecard";
 
 export function CaseOverview() {
   const c = useCase();
+  const a = useAccentUI();
   const [g0, g1, g2] = c.heroGradient;
+
+  const m = c.model;
+  const score = m ? scoreCase(computeModel(m), c.risks, m.operationalRisk) : null;
 
   return (
     <div className="-mx-8 -mt-8">
@@ -73,6 +79,16 @@ export function CaseOverview() {
 
       {/* ── Body ── */}
       <div className="px-8 mt-8 pb-8">
+        {score && (
+          <Section
+            eyebrow="Risk-adjusted view"
+            title="Scorecard"
+            intro="A single 0–100 grade blending the modelled return (50%), development risk (30%) and operational burden (20%) into one risk-adjusted score. The full axis-by-axis workings are revisited under Financials."
+          >
+            <RiskScorecard scorecard={score} softBorder={a.softBorder} softFrom={a.softFrom} />
+          </Section>
+        )}
+
         <Section eyebrow="The opportunity" title="Investment thesis">
           <Card>
             {c.summary.map((p, i) => (

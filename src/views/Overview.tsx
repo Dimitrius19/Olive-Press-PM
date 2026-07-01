@@ -12,7 +12,10 @@ import {
   FileText,
   Banknote,
   TrendingUp,
+  Gauge,
 } from "lucide-react";
+import { RiskScorecard } from "../components/RiskScorecard";
+import { olivePressScorecard } from "../projects/flagship-scores";
 
 function daysUntil(dateStr: string): number {
   const target = new Date(dateStr);
@@ -203,6 +206,28 @@ export function Overview() {
 
       {/* ── Main content ── */}
       <div className="px-8 mt-8 space-y-6 pb-8">
+        {/* Risk-adjusted score */}
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <Gauge className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-lg font-bold text-stone-800">
+              Risk-Adjusted Score
+            </h2>
+          </div>
+          <p className="text-sm text-stone-500 mb-4 max-w-3xl leading-relaxed">
+            A single 0&ndash;100 grade blending the modelled return (50%),
+            development risk (30%) and operational burden (20%). Olive Press
+            leads with a stabilised, post-subsidy net yield, which the return
+            axis &mdash; calibrated for a levered development IRR &mdash; scores
+            conservatively.
+          </p>
+          <RiskScorecard
+            scorecard={olivePressScorecard}
+            softBorder="border-l-emerald-500"
+            softFrom="from-emerald-500/[0.08]"
+          />
+        </div>
+
         {/* Budget & Activities side by side on desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Budget Gauge */}

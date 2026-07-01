@@ -16,6 +16,7 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  Gauge,
   RotateCcw,
 } from "lucide-react";
 import {
@@ -33,6 +34,8 @@ import {
 import { SliderInput } from "../components/SliderInput";
 import { StatusBadge } from "../components/StatusBadge";
 import { useCapex } from "../lib/capex-context";
+import { RiskScorecard } from "../components/RiskScorecard";
+import { ellinikonScorecard } from "../projects/flagship-scores";
 
 // ---------- Formatting Helpers ----------
 
@@ -582,6 +585,25 @@ export function BuildSell() {
         <p className="text-stone-500 mt-1 ml-10">
           Supernatural AE &mdash; Ellinikon / Athens Riviera &middot; build-to-sell model with two exit scenarios
         </p>
+      </div>
+
+      {/* A2. Risk-adjusted scorecard */}
+      <div>
+        <div className="flex items-center gap-3">
+          <Gauge className="text-sky-600" size={28} />
+          <h2 className="text-2xl font-bold text-stone-800">Risk-Adjusted Score</h2>
+        </div>
+        <p className="text-stone-500 mt-1 ml-10 mb-4">
+          The portfolio's 0&ndash;100 scorecard &mdash; modelled return, development risk and
+          operational burden, blended IRR 50% / development 30% / operational 20%. It reflects the
+          base case (the grade shown on the portfolio card) and is independent of the slider
+          adjustments below.
+        </p>
+        <RiskScorecard
+          scorecard={ellinikonScorecard}
+          softBorder="border-l-sky-500"
+          softFrom="from-sky-500/[0.08]"
+        />
       </div>
 
       {/* B. Adjust Assumptions Panel */}

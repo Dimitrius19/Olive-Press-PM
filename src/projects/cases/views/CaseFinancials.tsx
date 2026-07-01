@@ -8,41 +8,8 @@ import {
   fmtMoneyCompact,
   fmtPct,
   fmtX,
-  type ScoreAxis,
 } from "../model";
-
-// Colour band for a 0–100 score: green (strong) → amber (fair) → rose (weak).
-function band(score: number) {
-  if (score >= 70) return { bar: "bg-emerald-500", text: "text-emerald-700" };
-  if (score >= 45) return { bar: "bg-amber-500", text: "text-amber-700" };
-  return { bar: "bg-rose-500", text: "text-rose-600" };
-}
-
-function ScoreBar({ label, score, detail }: ScoreAxis) {
-  const b = band(score);
-  return (
-    <div>
-      <div className="flex items-baseline justify-between mb-1.5">
-        <span className="text-sm font-semibold text-stone-700">{label}</span>
-        <span className={`text-sm font-bold tabular-nums ${b.text}`}>
-          {Math.round(score)}
-          <span className="text-stone-400 font-normal"> / 100</span>
-        </span>
-      </div>
-      <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
-        <div className={`h-full rounded-full ${b.bar}`} style={{ width: `${score}%` }} />
-      </div>
-      <p className="text-xs text-stone-500 mt-1.5 leading-relaxed">{detail}</p>
-    </div>
-  );
-}
-
-const gradeStyles: Record<string, string> = {
-  A: "bg-emerald-500 text-white",
-  B: "bg-teal-500 text-white",
-  C: "bg-amber-500 text-white",
-  D: "bg-rose-500 text-white",
-};
+import { RiskScorecard } from "../../../components/RiskScorecard";
 
 export function CaseFinancials() {
   const c = useCase();
@@ -204,30 +171,7 @@ export function CaseFinancials() {
         title="Scorecard"
         intro="Each deal is scored 0–100 on three axes — the modelled return, the development risk on the register, and the operational burden of the asset — then blended (IRR 50%, development risk 30%, operational 20%) into a single grade."
       >
-        <Card className={`border-l-4 ${a.softBorder} bg-gradient-to-b ${a.softFrom} to-white`}>
-          <div className="flex items-center gap-5">
-            <div
-              className={`flex-none w-16 h-16 rounded-2xl grid place-items-center text-3xl font-black ${gradeStyles[score.grade] ?? "bg-stone-500 text-white"}`}
-            >
-              {score.grade}
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-stone-800 tabular-nums leading-none">
-                {Math.round(score.composite)}
-                <span className="text-base font-medium text-stone-400"> / 100</span>
-              </div>
-              <p className="text-sm text-stone-600 mt-1 font-medium">{score.verdict}</p>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="space-y-5">
-            <ScoreBar {...score.irr} />
-            <ScoreBar {...score.risk} />
-            <ScoreBar {...score.operational} />
-          </div>
-        </Card>
+        <RiskScorecard scorecard={score} softBorder={a.softBorder} softFrom={a.softFrom} />
       </Section>
 
       {fin && (

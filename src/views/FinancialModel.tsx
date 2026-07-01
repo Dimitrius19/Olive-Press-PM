@@ -17,6 +17,7 @@ import {
   Calculator,
   ChevronDown,
   ChevronRight,
+  Gauge,
   RotateCcw,
 } from "lucide-react";
 import {
@@ -33,6 +34,8 @@ import {
   type ScenarioResult,
 } from "../lib/financial-model";
 import { SliderInput } from "../components/SliderInput";
+import { RiskScorecard } from "../components/RiskScorecard";
+import { olivePressScorecard } from "../projects/flagship-scores";
 
 // ---------- Formatting Helpers ----------
 
@@ -310,6 +313,26 @@ export function FinancialModel() {
         <p className="text-stone-500 mt-1 ml-10">
           {modelYears}-year investment return analysis — 3 scenarios
         </p>
+      </div>
+
+      {/* A2. Risk-adjusted scorecard */}
+      <div>
+        <div className="flex items-center gap-3">
+          <Gauge className="text-amber-600" size={28} />
+          <h2 className="text-2xl font-bold text-stone-800">Risk-Adjusted Score</h2>
+        </div>
+        <p className="text-stone-500 mt-1 ml-10 mb-4">
+          The portfolio's 0–100 scorecard — modelled return, development risk and operational
+          burden, blended IRR 50% / development 30% / operational 20%. It reflects the base case
+          (the grade shown on the portfolio card) and is independent of the slider adjustments
+          below. Note the IRR axis is calibrated for a levered development return, so a stabilised
+          post-subsidy net yield sits low on it.
+        </p>
+        <RiskScorecard
+          scorecard={olivePressScorecard}
+          softBorder="border-l-amber-500"
+          softFrom="from-amber-500/[0.08]"
+        />
       </div>
 
       {/* B. Adjust Assumptions Panel */}
