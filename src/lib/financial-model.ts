@@ -51,6 +51,7 @@ export interface ScenarioResult {
   paybackYear: number | null;
   totalRevenuePerRoom: number;
   terminalValue: number;
+  terminalGainsTax: number; // corporate tax on the disposal gain (terminalValue - cost basis)
   totalReturn: number;
   yieldOnCost: number; // Stabilized NOI (Year 3) / Investment
   cashOnCash: number; // Same as YoC when no debt
@@ -270,6 +271,17 @@ export function runScenario(
   const lastNoi = projections[projections.length - 1].noi;
   const terminalValue = lastNoi / inputs.terminalCapRate;
 
+  // Capital-gains tax on disposal. The taxable gain is the sale proceeds
+  // (terminal value) less the asset's cost basis — here the all-in investment,
+  // since this model tracks neither depreciation nor its recapture. A Greek
+  // company holding the asset folds the gain into taxable profit at the
+  // corporate rate, so we reuse corporateTaxRate rather than the (currently
+  // suspended) 15% individual property-gains rate. A loss on sale yields no
+  // rebate here — the tax is floored at zero.
+  const terminalGain = Math.max(0, terminalValue - investment);
+  const terminalGainsTax = terminalGain * inputs.corporateTaxRate;
+  const terminalAfterTax = terminalValue - terminalGainsTax;
+
   // Cash flows for IRR: Year 0 = -investment, Years 1-N = NOI, last year = NOI + terminal
   const cashFlows: number[] = [-investment];
   for (let i = 0; i < projections.length; i++) {
@@ -309,13 +321,12 @@ export function runScenario(
   const stabilizedAfterTaxNoi = stabilizedYear?.afterTaxNoi ?? 0;
   const afterTaxYieldOnCost = investment > 0 ? stabilizedAfterTaxNoi / investment : 0;
 
-  // After-Tax IRR: cash flows using afterTaxNoi
+  // After-Tax IRR: after-tax operating NOI, plus disposal proceeds net of the
+  // gains tax (computed above) in the final year.
   const afterTaxCashFlows: number[] = [-investment];
   for (let i = 0; i < projections.length; i++) {
     const lastYear = i === projections.length - 1;
-    // Terminal value adjusted: sale proceeds after tax on gain
-    const terminalAfterTax = lastYear ? terminalValue : 0;
-    afterTaxCashFlows.push(projections[i].afterTaxNoi + terminalAfterTax);
+    afterTaxCashFlows.push(projections[i].afterTaxNoi + (lastYear ? terminalAfterTax : 0));
   }
   const afterTaxIrr = calculateIRR(afterTaxCashFlows);
 
@@ -329,8 +340,9 @@ export function runScenario(
   for (let i = 0; i < projections.length; i++) {
     const lastYear = i === projections.length - 1;
     if (lastYear) {
-      // Final year: leveraged CF + terminal value - remaining loan payoff
-      leveragedCashFlows.push(projections[i].afterTaxNoi - projections[i].debtService + terminalValue - remainingBalance);
+      // Final year: after-tax operating CF, plus disposal proceeds net of the
+      // gains tax, less the outstanding loan payoff.
+      leveragedCashFlows.push(projections[i].afterTaxNoi - projections[i].debtService + terminalAfterTax - remainingBalance);
     } else {
       leveragedCashFlows.push(projections[i].leveragedCashFlow);
     }
@@ -367,6 +379,7 @@ export function runScenario(
     paybackYear,
     totalRevenuePerRoom,
     terminalValue,
+    terminalGainsTax,
     totalReturn,
     yieldOnCost,
     cashOnCash,

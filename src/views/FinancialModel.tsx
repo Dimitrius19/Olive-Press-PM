@@ -821,6 +821,11 @@ export function FinancialModel() {
                   <p className="font-semibold text-stone-700">
                     {fmtEuroM(result.terminalValue)}
                   </p>
+                  {result.terminalGainsTax > 0 && (
+                    <p className="text-[10px] text-stone-400">
+                      −{fmtEuroK(result.terminalGainsTax)} exit gains tax
+                    </p>
+                  )}
                 </div>
               </div>
 
