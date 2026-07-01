@@ -869,6 +869,9 @@ export function FinancialModel() {
                     </p>
                   </div>
                 </div>
+                <p className="text-[10px] text-stone-400 mt-2">
+                  After {fmtEuroK(result.annualDepreciation)}/yr depreciation shield (25-yr life, 20% land) — recaptured at exit.
+                </p>
               </div>
 
               {/* Yield on Equity (post-subsidy, post-debt) */}

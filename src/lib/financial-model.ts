@@ -17,6 +17,9 @@ export interface ScenarioInputs {
   ltvPct: number; // Loan-to-Value, default 0 (no debt), range 0-0.80
   interestRate: number; // default 0.045 (4.5%)
   loanTermYears: number; // default 15
+  // Depreciation (optional; sensible defaults applied in runScenario)
+  landValuePct?: number; // non-depreciable land as a fraction of investment (default 0.2)
+  buildingUsefulLifeYears?: number; // straight-line life of the depreciable base (default 25 = 4%/yr, the Greek building rate)
 }
 
 export interface YearProjection {
@@ -35,6 +38,7 @@ export interface YearProjection {
   noi: number;
   cumulativeNoi: number;
   fcf: number;
+  depreciation: number; // annual straight-line depreciation (non-cash; shields tax)
   incomeTax: number;
   propertyTax: number;
   afterTaxNoi: number;
@@ -51,7 +55,9 @@ export interface ScenarioResult {
   paybackYear: number | null;
   totalRevenuePerRoom: number;
   terminalValue: number;
-  terminalGainsTax: number; // corporate tax on the disposal gain (terminalValue - cost basis)
+  terminalGainsTax: number; // corporate tax on the disposal gain (terminalValue - written-down basis)
+  annualDepreciation: number; // straight-line depreciation charged each operating year
+  accumulatedDepreciation: number; // total depreciation written off by disposal
   totalReturn: number;
   yieldOnCost: number; // Stabilized NOI (Year 3) / Investment
   cashOnCash: number; // Same as YoC when no debt
@@ -191,6 +197,17 @@ export function runScenario(
   const equityInvested = investment - loanAmount;
   const annualDebtService = calculatePMT(loanAmount, inputs.interestRate, inputs.loanTermYears);
 
+  // Depreciation: straight-line over the building's useful life, on the
+  // depreciable (non-land) portion of the investment. It is non-cash, so it does
+  // not reduce cash NOI, but it shields operating income from tax and writes down
+  // the asset's tax basis -- which enlarges the gain recaptured at disposal. No
+  // loss carry-forward is modelled: a year whose depreciation exceeds NOI simply
+  // pays zero tax that year, and the unused shield is not banked.
+  const landValuePct = inputs.landValuePct ?? 0.2;
+  const buildingUsefulLifeYears = inputs.buildingUsefulLifeYears ?? 25;
+  const depreciableBase = investment * (1 - landValuePct);
+  const annualDepreciation = depreciableBase / buildingUsefulLifeYears;
+
   let cumulativeLeveragedCf = 0;
 
   for (let i = 0; i < modelYears; i++) {
@@ -229,8 +246,9 @@ export function runScenario(
 
     cumulativeNoi += noi;
 
-    // Tax calculations
-    const incomeTax = Math.max(0, noi * inputs.corporateTaxRate);
+    // Tax calculations. Depreciation shields taxable income (non-cash), so it
+    // lowers the tax bill but not the cash NOI from which afterTaxNoi is drawn.
+    const incomeTax = Math.max(0, (noi - annualDepreciation) * inputs.corporateTaxRate);
     const propertyTax = inputs.propertyTaxAnnual;
     const afterTaxNoi = noi - incomeTax - propertyTax;
 
@@ -258,6 +276,7 @@ export function runScenario(
       noi,
       cumulativeNoi,
       fcf,
+      depreciation: annualDepreciation,
       incomeTax,
       propertyTax,
       afterTaxNoi,
@@ -272,13 +291,15 @@ export function runScenario(
   const terminalValue = lastNoi / inputs.terminalCapRate;
 
   // Capital-gains tax on disposal. The taxable gain is the sale proceeds
-  // (terminal value) less the asset's cost basis — here the all-in investment,
-  // since this model tracks neither depreciation nor its recapture. A Greek
-  // company holding the asset folds the gain into taxable profit at the
-  // corporate rate, so we reuse corporateTaxRate rather than the (currently
-  // suspended) 15% individual property-gains rate. A loss on sale yields no
-  // rebate here — the tax is floored at zero.
-  const terminalGain = Math.max(0, terminalValue - investment);
+  // (terminal value) less the asset's WRITTEN-DOWN tax basis: the all-in
+  // investment net of the depreciation already claimed. Depreciation therefore
+  // does not escape tax — it is recaptured here, enlarging the gain. A Greek
+  // company folds the gain into taxable profit at the corporate rate, so we
+  // reuse corporateTaxRate rather than the (currently suspended) 15% individual
+  // property-gains rate. A loss on sale yields no rebate — floored at zero.
+  const accumulatedDepreciation = Math.min(annualDepreciation * modelYears, depreciableBase);
+  const taxBasisAtExit = investment - accumulatedDepreciation;
+  const terminalGain = Math.max(0, terminalValue - taxBasisAtExit);
   const terminalGainsTax = terminalGain * inputs.corporateTaxRate;
   const terminalAfterTax = terminalValue - terminalGainsTax;
 
@@ -380,6 +401,8 @@ export function runScenario(
     totalRevenuePerRoom,
     terminalValue,
     terminalGainsTax,
+    annualDepreciation,
+    accumulatedDepreciation,
     totalReturn,
     yieldOnCost,
     cashOnCash,

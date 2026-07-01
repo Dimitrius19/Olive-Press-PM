@@ -10,9 +10,10 @@ import {
   type ScenarioInputs,
 } from "./financial-model";
 
-// Base capitalises BELOW all-in cost (a loss on disposal); only the Optimistic
-// exit clears cost and produces a taxable gain — so the two scenarios exercise
-// both sides of the disposal-tax logic.
+// Named scenarios exercise both sides of the disposal-tax logic: the Pessimistic
+// exit sells below its written-down basis (a loss), while the Optimistic exit
+// clears cost and recaptures depreciation as a taxable gain.
+const PESSIMISTIC = SCENARIOS[0];
 const BASE = SCENARIOS[1];
 const OPTIMISTIC = SCENARIOS[2];
 const run = (inputs: ScenarioInputs) =>
@@ -29,9 +30,10 @@ function afterTaxIrrFromTerminal(r: ReturnType<typeof run>, terminalInflow: numb
 }
 
 describe("runScenario — disposal gain is taxed", () => {
-  it("taxes the gain (proceeds − cost basis) at the corporate rate", () => {
+  it("taxes the recaptured gain (proceeds − written-down basis) at the corporate rate", () => {
     const r = run(OPTIMISTIC);
-    const expectedGain = Math.max(0, r.terminalValue - INVESTMENT);
+    const basis = INVESTMENT - r.accumulatedDepreciation;
+    const expectedGain = Math.max(0, r.terminalValue - basis);
     expect(expectedGain).toBeGreaterThan(0);
     expect(r.terminalGainsTax).toBeCloseTo(expectedGain * OPTIMISTIC.corporateTaxRate, 6);
   });
@@ -54,9 +56,9 @@ describe("runScenario — disposal gain is taxed", () => {
     expect(afterTaxIrrFromTerminal(r, r.terminalValue)).toBeGreaterThan(r.afterTaxIrr);
   });
 
-  it("floors the tax at zero when the asset capitalises below cost (Base)", () => {
-    const r = run(BASE);
-    expect(r.terminalValue).toBeLessThan(INVESTMENT);
+  it("floors the tax at zero when the asset sells below its written-down basis (Pessimistic)", () => {
+    const r = run(PESSIMISTIC);
+    expect(r.terminalValue).toBeLessThan(INVESTMENT - r.accumulatedDepreciation);
     expect(r.terminalGainsTax).toBe(0);
   });
 
@@ -73,8 +75,42 @@ describe("runScenario — disposal gain is taxed", () => {
 
   it("the gains tax is basis-driven, independent of leverage", () => {
     const levered = run({ ...OPTIMISTIC, ltvPct: 0.5 });
-    const expectedGain = Math.max(0, levered.terminalValue - INVESTMENT);
+    const basis = INVESTMENT - levered.accumulatedDepreciation;
+    const expectedGain = Math.max(0, levered.terminalValue - basis);
     expect(levered.terminalGainsTax).toBeCloseTo(expectedGain * OPTIMISTIC.corporateTaxRate, 6);
     expect(Number.isFinite(levered.leveragedIrr)).toBe(true);
+  });
+});
+
+describe("runScenario — depreciation", () => {
+  it("charges straight-line depreciation on the non-land base", () => {
+    const r = run(BASE);
+    const expectedAnnual = (INVESTMENT * (1 - 0.2)) / 25; // defaults: 20% land, 25y life
+    expect(r.annualDepreciation).toBeCloseTo(expectedAnnual, 6);
+    expect(r.accumulatedDepreciation).toBeCloseTo(expectedAnnual * MODEL_YEARS, 6);
+    // Every operating year carries the same charge.
+    expect(r.projections[0].depreciation).toBeCloseTo(expectedAnnual, 6);
+  });
+
+  it("shields operating income, lowering the annual tax vs no depreciation", () => {
+    const withDep = run(OPTIMISTIC);
+    const noDep = run({ ...OPTIMISTIC, landValuePct: 1 }); // depreciable base = 0
+    expect(noDep.annualDepreciation).toBe(0);
+    // A stabilised year pays less income tax, hence more after-tax NOI, with the shield.
+    expect(withDep.projections[5].incomeTax).toBeLessThan(noDep.projections[5].incomeTax);
+    expect(withDep.projections[5].afterTaxNoi).toBeGreaterThan(noDep.projections[5].afterTaxNoi);
+  });
+
+  it("recaptures depreciation at exit: a gainful sale is taxed more than with no depreciation", () => {
+    const withDep = run(OPTIMISTIC);
+    const noDep = run({ ...OPTIMISTIC, landValuePct: 1 });
+    expect(withDep.terminalGainsTax).toBeGreaterThan(noDep.terminalGainsTax);
+  });
+
+  it("caps accumulated depreciation at the depreciable base over a long horizon", () => {
+    // 5-year life over a 10-year hold would over-depreciate; it is capped at the base.
+    const r = run({ ...BASE, buildingUsefulLifeYears: 5 });
+    const base = INVESTMENT * (1 - 0.2);
+    expect(r.accumulatedDepreciation).toBeCloseTo(base, 6);
   });
 });
